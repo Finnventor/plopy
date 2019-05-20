@@ -134,8 +134,9 @@ class CustomNotebook(ttk.Notebook):
 
     def add(self, widget, **kwargs):
         ttk.Notebook.add(self, widget, **kwargs)
-        if self._isempty and self._emptyframe:
-            self.forget(0)
+        print(self._isempty, bool(self._emptyframe))
+        if self._isempty and len(self.tabs()) > 1:
+            self.hide(0)
             self._isempty = False
 
     def forget(self, index):
@@ -143,6 +144,10 @@ class CustomNotebook(ttk.Notebook):
             ttk.Notebook.forget(self, index)
             self.winfo_children()[index].destroy()
             self._root().update()
+        if not self.select():
+            self._isempty = True
+            self.add(self._emptyframe)
+            self.tab(0, state="disabled")
 
     def on_close_press(self, event):
         """Called when the button is pressed over the close button"""
@@ -160,7 +165,10 @@ class CustomNotebook(ttk.Notebook):
             return
 
         element = self.identify(event.x, event.y)
-        index = self.index("@%d,%d" % (event.x, event.y))
+        try:
+            index = self.index("@%d,%d" % (event.x, event.y))
+        except tk.TclError:
+            return
 
         if "close" in element and self._active == index:
             self.forget(index)
@@ -450,9 +458,9 @@ class Window(tk.Tk):
         menu = tk.Menu(self)
         # File
         m = tk.Menu(menu, tearoff=0)
-        m.add_command(label="Open", command=self.selectfile, underline=0)
-        m.add_command(label="Reload", command=self.reloadfiles, underline=0)
-        m.add_command(label="Save", command=self.savefile, underline=0)
+        m.add_command(label="Load Data", command=self.selectfile)
+        m.add_command(label="Reload Data", command=self.reloadfiles)
+        m.add_command(label="Save Image", command=self.savefile)
         menu.add_cascade(label="File", menu=m)
 
         # Format
@@ -520,16 +528,8 @@ class Window(tk.Tk):
         self.notebook = CustomNotebook(self)
         self.notebook.grid(row=1, column=1, sticky="n")
 
-        # add a fake disabled tab to ensure proper sizing
-#        self.fakeframeoptions = FrameOptions(self, self.notebook, "", "",
-#                                             "#000000")
-#        self.fakeframeoptions.line = ""  # prevent fake frame from showing
-#        self.fakeframeoptions.marker = ""
-#        self.notebook.add(self.fakeframeoptions,
-#                          text="", sticky="nesw")
-#        self.notebook.tab(0, state="disabled")
-
         self.bind("<Control-s>", self.savefile)
+        self.bind("<Control-r>", self.reloadfiles)
         self.bind("<Control-o>", self.selectfile)
 
         self.addfiles(files)
