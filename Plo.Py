@@ -302,6 +302,7 @@ class FrameOptions(ttk.Frame):
                  *args, **kwargs):
         ttk.Frame.__init__(self, notebook, *args, **kwargs)
         self.root = root
+        self.title = title
         self.filename = filename
         self.defaultcolor = self.color = defaultcolor
         self.xcol = 0
@@ -570,6 +571,8 @@ class Window(tk.Tk):
             ylim = self.canvas.axes.set_ylim()
             self.canvas.axes.cla()
             for frame in self.notebook.winfo_children():
+                if not frame.title:
+                    continue
                 data = self.data[frame.filename]
                 self.canvas.axes.plot(data[:, frame.xcol],
                                       data[:, frame.ycol],
