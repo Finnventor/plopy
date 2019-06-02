@@ -1,9 +1,10 @@
 # This data can be used for testing plopy.
 Weird Header 1 23
 X, Y
-00, 0.0
-1 1,
-02 4
-3,, 9.000
-4.0 16
-005 25
+00, 0.0 1
+1 1 2,
+02 4 ,4
+3,, 9.000 8
+
+4.0 16 16
+005 25 32.0

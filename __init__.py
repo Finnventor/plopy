@@ -2,7 +2,7 @@
 
 from __future__ import print_function, division
 
-from sys import exit, argv
+import sys
 from os.path import basename, isfile
 
 
@@ -14,13 +14,13 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 import numpy as np
 
-try:
+try:  # Python 3
     import tkinter as tk
     import tkinter.ttk as ttk
     from tkinter.filedialog import askopenfilenames, asksaveasfilename
     from tkinter.colorchooser import askcolor
     from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk as Navigation
-except ImportError:
+except ImportError:  # Python 2
     import Tkinter as tk
     import ttk
     from tkFileDialog import askopenfilenames, asksaveasfilename
@@ -30,6 +30,8 @@ except ImportError:
 
 _pad = 5  # Default inter-widget padding
 _icon_base64 = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAD1BMVEU9S8398wXFw8Xt6+39//2jZEuFAAAAU0lEQVQI103O0Q2AIAwEUD66gIkTqAOA1wEo3P4zKaUY+/VyueSajrh0sSvBNkDqgG17AOY4CwqA+026qWpzVK1RFvGEzLMM5Fkmhe2Hb2JhvfEAWLIaQGXGTJoAAAAASUVORK5CYII="
+
+_root = None
 
 
 def array_from_file(filename):
@@ -41,8 +43,6 @@ def array_from_file(filename):
                 line = line.replace(",", " ")
                 row = []
                 for num in line.split():
-                    if len(num) < 1:
-                        break
                     try:
                         row.append(float(num))
                     except ValueError:
@@ -67,7 +67,7 @@ class _ToolTip(object):
         widget.bind('<Leave>', self.hidetip)
 
     def showtip(self, *_):
-        """Display text in tooltip window"""
+        """ Show the tooltip (called on enter event) """
         if self.tipwindow or not self.text:
             return
         x, y, _, cy = self.widget.bbox("insert")
@@ -91,6 +91,7 @@ class _ToolTip(object):
         label.pack(ipadx=1)
 
     def hidetip(self, *_):
+        """ Hide the tooltip (called on leave event) """
         tw = self.tipwindow
         self.tipwindow = None
         if tw:
@@ -102,6 +103,7 @@ class _CustomNotebook(ttk.Notebook):
     A ttk Notebook with close buttons on each tab, customized for showing
     FrameOptions. It automatically creates a hidden tab if no others exist
     to ensure the notebook keeps its size.
+    Based on an example by @BrianOakley (boakley.github.io)
     """
     __initialized = False
 
@@ -175,10 +177,10 @@ class _CustomNotebook(ttk.Notebook):
         style = ttk.Style()
         self.images = (
             tk.PhotoImage("img_close", data='''
-                iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAVklEQVR4AWMYWcC
-                VCDWOhBS4AfF/IG7Ho6YdqsaJkGH9MMPwGNIPEyDDMExDSDWsHogb4IaQCaaBDK
-                DIEISrEAZRakgDYa9RHtiURz9dE6QrUdlo5AAAvx8nV9K3YjUAAAAASUVORK5CY
-                II='''),
+                iVBORw0KGgoAAAANSUhEUgAAABIAAAASBAMAAACk4JNkAAAAGFBMVEUAAAAAAAA
+                AAAAAAAAAAAAAAAAAAAAAAABWNxwqAAAAB3RSTlMAj4FweoeWafOgkAAAAC1JRE
+                FUCNdjIAs4MLBAGMyFDOIGEKa4ailUlq1cAMpihLPElQoxdDgwMJFlOwCPLARt2
+                xEilQAAAABJRU5ErkJggg=='''),
             tk.PhotoImage("img_closeactive", data='''
                 iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAQAAAD8x0bcAAAA1UlEQVR4AZXSM0I
                 GYBjA8d8et7BlHCDrCukUGUt2bbm27HOFK2TXZ//f6X0smZOvQ79+HfLFpdC1z7
@@ -192,10 +194,12 @@ class _CustomNotebook(ttk.Notebook):
                 Pm+ZWWmYOzs4OZloTc1lPdsKetXIPMSS21kwzBKsTUVoK26i2sjcKrjOzCawPzu
                 FWi9HBXoh/qHDh6h3HY8x/J0RdwU4dVhmCsEporcEmSho2ky6dyXd1P5RYRdpqN
                 G4S6AP7i8Z1JOgKFYPl9mGSO39dCbpMseCOXUJjGV9mbKvzGC4+4qP/m7PJBAAA
-                AAElFTkSuQmCC''')
+                AAElFTkSuQmCC'''),
+            tk.PhotoImage("img_blank", data='')
         )
 
         style.element_create("close", "image", "img_close",
+                             ("disabled", "img_blank"),
                              ("active", "pressed", "!disabled", "img_closepressed"),
                              ("active", "!disabled", "img_closeactive"), border=8, sticky='')
         style.layout("CustomNotebook", [("CustomNotebook.client", {"sticky": "nswe"})])
@@ -222,10 +226,10 @@ class _CustomNotebook(ttk.Notebook):
         ])
 
 
-class MplCanvas(ttk.Frame):
+class _MplCanvas(ttk.Frame):
     """
     A matplotlib canvas for tkinter.
-    Can be updated, but remember to call .show()
+    Can be updated, but remember to call .draw()
     """
     def __init__(self, master, width=5, height=4, dpi=100):
         ttk.Frame.__init__(self, master)
@@ -243,14 +247,8 @@ class MplCanvas(ttk.Frame):
 
         Navigation(self.canvas, self)
 
-    def update_figure(self, data):
-        self.axes.cla()
-        for k, v in data.items():
-            self.axes.plot(v[:, 0], v[:, 1])
-        self.draw()
 
-
-class FileView(tk.Toplevel):
+class _FileView(tk.Toplevel):
     """
     Display the first 20 and last 5 rows of a file,
     or their parsed version, in a Toplevel.
@@ -309,7 +307,7 @@ class FileView(tk.Toplevel):
 
 
 class _FrameOptions(ttk.Frame):
-    """A pane consisting of options for a specific line on the plot."""
+    """ A pane consisting of options for a specific line on the plot. """
     def __init__(self, root, notebook, title, filename, defaultcolor,
                  *args, **kwargs):
         ttk.Frame.__init__(self, notebook, *args, **kwargs)
@@ -331,10 +329,9 @@ class _FrameOptions(ttk.Frame):
         if not filename:
             b.config(state="disabled")
 
-        L = ttk.Label(self, text="Columns", style="W.TLabel")
-
-        colf = ttk.LabelFrame(self, labelwidget=L, style="W.TFrame",
-                              relief="groove")
+        colf = ttk.LabelFrame(self, style="W.TFrame", relief="groove",
+                              labelwidget=ttk.Label(self, text="Columns",
+                                                    style="W.TLabel"))
         colf.grid(row=1, columnspan=3, sticky="EW", padx=_pad, ipady=(3))
 
         colnum = len(self.root.data[self.filename][0])
@@ -405,7 +402,7 @@ class _FrameOptions(ttk.Frame):
         Open a window showing both the raw and parsed version of the associated
         file. Should be disabled for datasets.
         """
-        FileView(self.root, self.filename)
+        _FileView(self.root, self.filename)
 
     def selectcolor(self):
         """ Open a colorchooser dialog (for the color of the line) """
@@ -446,7 +443,7 @@ class _FrameOptions(ttk.Frame):
 
 
 class Window(tk.Tk):
-    """The main plopy window. Use start() to open."""
+    """ The main plopy window. Use start() to open. """
     def __init__(self, files=None, data=None, *args, **kwargs):
         files = files or []
         data = data or {}
@@ -480,6 +477,8 @@ class Window(tk.Tk):
         self.minorticks = tk.BooleanVar()
         self.showgrid = tk.BooleanVar()
         self.aspectratio = tk.StringVar(value="auto")
+        self.xscale = tk.StringVar(value="linear")
+        self.yscale = tk.StringVar(value="linear")
         self.lockaxeslimits = tk.BooleanVar()
         self.doautoupdate = tk.BooleanVar()
         self.doautoupdate.set(True)
@@ -492,6 +491,13 @@ class Window(tk.Tk):
                           onvalue="equal", offvalue="auto",
                           command=self.update, variable=self.aspectratio)
         m.add_separator()
+        m.add_checkbutton(label="Logarithmic X-Axis",
+                          onvalue="log", offvalue="linear",
+                          command=self.setxscale, variable=self.xscale)
+        m.add_checkbutton(label="Logarithmic Y-Axis",
+                          onvalue="log", offvalue="linear",
+                          command=self.setyscale, variable=self.yscale)
+        m.add_separator()
         m.add_checkbutton(label="Lock Axes Limits",
                           command=self.update, variable=self.lockaxeslimits)
         m.add_checkbutton(label="Auto-Update Graph",
@@ -500,7 +506,7 @@ class Window(tk.Tk):
 
         self.config(menu=menu)
 
-        self.canvas = MplCanvas(self)
+        self.canvas = _MplCanvas(self)
         self.canvas.grid(row=1, column=0, sticky="nsew", padx=5, rowspan=2)
 
         self.grid_columnconfigure(0, weight=1, minsize=300)
@@ -611,6 +617,8 @@ class Window(tk.Tk):
                 self.canvas.axes.set_ylim(ylim)
             self.canvas.axes.grid(self.showgrid.get())
             self.canvas.axes.set_aspect(self.aspectratio.get())
+            self.canvas.axes.set_xscale(self.xscale.get())
+            self.canvas.axes.set_yscale(self.yscale.get())
 
             self.canvas.draw()
 
@@ -629,6 +637,16 @@ class Window(tk.Tk):
         self.canvas.axes.set_ylabel(self.ylabel.get())
         self.canvas.draw()
 
+    def setxscale(self, *_):
+        """ Update the graph's x-axis scale. """
+        self.canvas.axes.set_xscale(self.xscale.get())
+        self.canvas.draw()
+
+    def setyscale(self, *_):
+        """ Update the graph's y-axis scale. """
+        self.canvas.axes.set_yscale(self.yscale.get())
+        self.canvas.draw()
+
     def reloadfiles(self, *_):
         """ Re-parse all loaded files, then update the graph. """
         for filename in self.data.keys():
@@ -639,17 +657,17 @@ class Window(tk.Tk):
     def savefile(self, *_):
         """ Save the plot as an image. """
         plttitle = self.canvas.figure._suptitle
+        filetypes = [(v, "."+k) for k, v in
+                     self.canvas.canvas.get_supported_filetypes().items()]
         if plttitle and plttitle.get_text():
             plttitle = plttitle.get_text()
-            if not plttitle.endswith(".png"):
+            if not plttitle.lower().endswith(".png"):
                 plttitle += ".png"
         else:
             plttitle = ""
         filename = asksaveasfilename(title="Plo.Py - Save Plot",
                                      initialfile=plttitle,
-                                     filetypes=[('Portable Network Graphics',
-                                                 '.png'),
-                                                ('All Files', '*')])
+                                     filetypes=[("All Files", "*")]+filetypes)
         if filename:
             self.canvas.figure.savefig(filename)
 
@@ -733,8 +751,10 @@ def start():
     Open the GUI. Note that this function should always be called last;
     the program exits after this.
     """
-    global root
-    map(add_file, argv[1:])
+    global _root
+
+    for file in sys.argv[1:]:
+        add_file(file)
 
     try:
         from ctypes import windll
@@ -742,11 +762,11 @@ def start():
     except Exception:
         pass
 
-    root = Window(_files_to_load, _data_to_load)
+    _root = Window(_files_to_load, _data_to_load)
     # set sizes
-    root.update()
-    root.minsize(root.winfo_width()-100, root.winfo_height()-10)
-    exit(root.mainloop())
+    _root.update()
+    _root.minsize(_root.winfo_width()-100, _root.winfo_height()-10)
+    exit(_root.mainloop())
 
 
 if __name__ == "__main__":
