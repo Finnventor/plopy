@@ -551,6 +551,10 @@ class Window(tk.Tk):
         self.bind("<Control-r>", self.reloadfiles)
         self.bind("<Control-o>", self.selectfile)
 
+        self.after(1, lambda: self.load(files, data))
+
+    def load(self, files, data):
+        """ Load pre-selected files and data. """
         self.addfiles(files)
         for name, array in data.items():
             self.adddata(name, array)
@@ -589,9 +593,9 @@ class Window(tk.Tk):
                 self.titlevar.set(basename(filenames[0]))
             self.update()
 
-    def update(self):
+    def update(self, force=False):
         """ Update the graph. """
-        if self.doautoupdate.get():
+        if force or self.doautoupdate.get():
             xlim = self.canvas.axes.set_xlim()
             ylim = self.canvas.axes.set_ylim()
             self.canvas.axes.cla()
@@ -655,7 +659,7 @@ class Window(tk.Tk):
         self.update()
 
     def savefile(self, *_):
-        """ Save the plot as an image. """
+        """ Save the plot as an image or other format. """
         plttitle = self.canvas.figure._suptitle
         filetypes = [(v, "."+k) for k, v in
                      self.canvas.canvas.get_supported_filetypes().items()]
@@ -672,6 +676,7 @@ class Window(tk.Tk):
             self.canvas.figure.savefig(filename)
 
     def getdefcolor(self):
+        """ Get a default color from the matplotlib cycler. """
         self.defcolorindex += 1
         return self.defcolors[self.defcolorindex % len(self.defcolors)]
 
