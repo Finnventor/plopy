@@ -594,7 +594,7 @@ class Window(tk.Tk):
             self.update()
 
     def update(self, force=False):
-        """ Update the graph. """
+        """ Update the _MplCanvas. """
         if force or self.doautoupdate.get():
             xlim = self.canvas.axes.set_xlim()
             ylim = self.canvas.axes.set_ylim()
@@ -676,7 +676,7 @@ class Window(tk.Tk):
             self.canvas.figure.savefig(filename)
 
     def getdefcolor(self):
-        """ Get a default color from the matplotlib cycler. """
+        """ Get a color from the default matplotlib cycler. """
         self.defcolorindex += 1
         return self.defcolors[self.defcolorindex % len(self.defcolors)]
 
@@ -741,10 +741,10 @@ def add_array(array, name):
     except Exception:
         print("[PloPy]: Could not convert {} into numpy array".format(name))
         return False
-    if array.shape == 2:
+    if len(array.shape) == 2:
         _data_to_load[name] = array
         if not suppress_errors and name in _data_to_load:
-            print("[PloPy]: Array {} updated because it was already loaded")
+            print("[PloPy]: Array {} updated (it was already loaded).")
         return True
     if not suppress_errors:
         print("[PloPy]: Array must be 2D (of columns and rows).")
