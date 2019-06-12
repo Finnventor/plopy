@@ -334,11 +334,11 @@ class _FrameOptions(ttk.Frame):
                                                     style="W.TLabel"))
         colf.grid(row=1, columnspan=3, sticky="EW", padx=_pad, ipady=(3))
 
-        colnum = len(self.root.data[self.filename][0])
-        columns = ["Column "+str(c) for c in range(1, 1+colnum)]
+        s = self.root.data[self.filename or self.title].shape
 
-        ttk.Label(colf, style="W.TLabel",
-                  text="Size: {}".format(self.root.data[self.filename].shape)
+        columns = ["Column "+str(c) for c in range(1, 1 + s[1])]
+
+        ttk.Label(colf, style="W.TLabel", text="Size: {}".format(s)
                   ).grid(row=0, column=0, padx=_pad)
 
         ttk.Label(colf, text="X:", style="W.TLabel"
@@ -352,7 +352,7 @@ class _FrameOptions(ttk.Frame):
                   ).grid(row=0, column=4, padx=(2*_pad, 0))
         self.ycolumn = tk.StringVar()
         ttk.OptionMenu(colf, self.ycolumn,
-                       columns[1] if colnum > 1 else columns[0], *columns,
+                       columns[1] if s[1] > 1 else columns[0], *columns,
                        style="W.TMenubutton").grid(row=0, column=5)
 
         colf.grid_columnconfigure(1, weight=1)
@@ -564,6 +564,7 @@ class Window(tk.Tk):
         self.data[name] = array
         _FrameOptions(self, self.notebook, name, None, self.getdefcolor(),
                       style="W.TFrame")
+        self.update()
 
     def selectfile(self, *_):
         """
@@ -602,7 +603,7 @@ class Window(tk.Tk):
             for frame in self.notebook.winfo_children():
                 if not frame.title:
                     continue
-                data = self.data[frame.filename]
+                data = self.data[frame.filename or frame.title]
                 self.canvas.axes.plot(data[:, frame.xcol],
                                       data[:, frame.ycol],
                                       marker=frame.marker,
@@ -680,6 +681,10 @@ class Window(tk.Tk):
         self.defcolorindex += 1
         return self.defcolors[self.defcolorindex % len(self.defcolors)]
 
+    def destroy(self):
+        self.doautoupdate.set(False)
+        tk.Tk.destroy(self)
+
 
 _files_to_load = []
 _data_to_load = {}
@@ -743,8 +748,9 @@ def add_array(array, name):
         return False
     if len(array.shape) == 2:
         _data_to_load[name] = array
-        if not suppress_errors and name in _data_to_load:
-            print("[PloPy]: Array {} updated (it was already loaded).")
+        if name in _data_to_load and not suppress_errors:
+            print("[PloPy]: Array {} updated (it was already loaded)."
+                  .format(name))
         return True
     if not suppress_errors:
         print("[PloPy]: Array must be 2D (of columns and rows).")
