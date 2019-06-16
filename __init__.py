@@ -16,7 +16,8 @@ import numpy as np
 
 try:  # Python 3
     import tkinter as tk
-    import tkinter.ttk as ttk
+    from tkinter import ttk
+    from tkinter.messagebox import askquestion
     from tkinter.filedialog import askopenfilenames, asksaveasfilename
     from tkinter.colorchooser import askcolor
     from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk as Navigation
@@ -406,7 +407,7 @@ class _FrameOptions(ttk.Frame):
 
     def selectcolor(self):
         """ Open a colorchooser dialog (for the color of the line) """
-        color = askcolor(self.color, title="Select Color -")[1]
+        color = askcolor(self.color, title="Select Color - Plo.Py")[1]
         if color is not None:
             self.root.style.configure(color+".TButton",
                                       background=color)
@@ -447,6 +448,7 @@ class Window(tk.Tk):
     def __init__(self, files=None, data=None, *args, **kwargs):
         files = files or []
         data = data or {}
+        self.isedited = False
         tk.Tk.__init__(self, *args, **kwargs)
         self.title("Plo.Py")
 
@@ -627,6 +629,8 @@ class Window(tk.Tk):
 
             self.canvas.draw()
 
+            self.isedited = True
+
     def settitle(self, *_):
         """ Update the graph's title. """
         self.canvas.figure.suptitle(self.titlevar.get())
@@ -660,7 +664,10 @@ class Window(tk.Tk):
         self.update()
 
     def savefile(self, *_):
-        """ Save the plot as an image or other format. """
+        """
+        Save the plot as an image or other format.
+        Returns whethere the plot was saved.
+        """
         plttitle = self.canvas.figure._suptitle
         filetypes = [(v, "."+k) for k, v in
                      self.canvas.canvas.get_supported_filetypes().items()]
@@ -675,6 +682,9 @@ class Window(tk.Tk):
                                      filetypes=[("All Files", "*")]+filetypes)
         if filename:
             self.canvas.figure.savefig(filename)
+            self.isedited = False
+            return True
+        return False
 
     def getdefcolor(self):
         """ Get a color from the default matplotlib cycler. """
@@ -682,6 +692,17 @@ class Window(tk.Tk):
         return self.defcolors[self.defcolorindex % len(self.defcolors)]
 
     def destroy(self):
+        if self.isedited and not self.notebook._isempty:
+            response = askquestion(title="Plo.Py",
+                                   message="Save plot before closing?",
+                                   type="yesnocancel")
+
+            if response == "yes":
+                if not self.savefile():
+                    return
+            elif response == "cancel":
+                return
+
         self.doautoupdate.set(False)
         tk.Tk.destroy(self)
 
