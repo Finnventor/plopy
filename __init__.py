@@ -10,7 +10,7 @@ from matplotlib import use
 use("TkAgg")
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
-import matplotlib.ticker as ticker
+from matplotlib import ticker, dates
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 import numpy as np
@@ -315,6 +315,158 @@ class _FileView(_ArrayView):
         self.string.set(self.original)
 
 
+class AxesOptions(tk.Toplevel):
+    """Options for configuring axes."""
+    scales = {"Linear": "linear", "Logarithmic": "log"}
+    locators = {"None": ticker.NullLocator, "Auto": ticker.AutoLocator,
+                "Logarithmic": ticker.LogLocator, "Date": dates.AutoDateLocator}
+
+    formatters = {"None": ticker.NullFormatter, "Auto": ticker.ScalarFormatter,
+                  "Logarithmic": ticker.LogFormatter,
+                  "Date": dates.AutoDateFormatter}
+
+    mlocators = {"None": ticker.NullLocator, "Auto": ticker.AutoMinorLocator}
+    def __init__(self, root, ax, *args, **kwargs):
+        tk.Toplevel.__init__(self, root, *args, **kwargs)
+        self.title("Plo.Py - Configure Axes")
+        self.tk.call('wm', 'iconphoto', self._w,
+                     tk.PhotoImage(master=self, data=_icon_base64))
+        self.root = root
+        self.ax = ax
+        self.xscale = tk.StringVar(value=next((k for k, v in self.scales.items() if v == ax.xaxis.get_scale()), ""))
+        self.yscale = tk.StringVar(value=next((k for k, v in self.scales.items() if v == ax.yaxis.get_scale()), ""))
+        self.xlocator = tk.StringVar(value=next((k for k, v in self.locators.items() if v == type(ax.xaxis.get_major_locator())), ""))
+        self.ylocator = tk.StringVar(value=next((k for k, v in self.locators.items() if v == type(ax.yaxis.get_major_locator())), ""))
+        self.xformatter = tk.StringVar(value=next((k for k, v in self.formatters.items() if v == type(ax.xaxis.get_major_formatter())), ""))
+        self.yformatter = tk.StringVar(value=next((k for k, v in self.formatters.items() if v == type(ax.yaxis.get_major_formatter())), ""))
+        self.xmlocator = tk.StringVar(value=next((k for k, v in self.mlocators.items() if v == type(ax.xaxis.get_minor_locator())), ""))
+        self.ymlocator = tk.StringVar(value=next((k for k, v in self.mlocators.items() if v == type(ax.yaxis.get_minor_locator())), ""))
+
+        w = 15  # OptionMenu width
+
+        # Scales
+        f = ttk.LabelFrame(self, text="Scale")
+        ttk.Label(f, text="X:").grid(row=0, column=0, sticky="nw", padx=(5, 1), pady=(2, 4))
+        o = ttk.OptionMenu(f, self.xscale, self.xscale.get(),
+                           *self.scales.keys())
+        o.config(width=w)
+        o.grid(row=0, column=1, sticky="new", padx=(0, 5), pady=(0, 5))
+        ttk.Label(f, text="Y:").grid(row=0, column=2, sticky="nw", padx=(5, 1), pady=(2, 4))
+        o = ttk.OptionMenu(f, self.yscale, self.yscale.get(),
+                           *self.scales.keys())
+        o.config(width=w)
+        o.grid(row=0, column=3, sticky="new", padx=(0, 5), pady=(0, 5))
+        f.columnconfigure(1, weight=1)
+        f.columnconfigure(3, weight=1)
+        f.rowconfigure(0, weight=1)
+        f.grid(row=0, column=0, sticky="new", padx=7, pady=7)
+
+        # Locators
+        f = ttk.LabelFrame(self, text="Tick Locations")
+        ttk.Label(f, text="X:").grid(row=0, column=0, sticky="nw", padx=(5, 1), pady=(2, 4))
+        o = ttk.OptionMenu(f, self.xlocator, self.xlocator.get(),
+                           *self.locators.keys())
+        o.config(width=w)
+        o.grid(row=0, column=1, sticky="new", padx=(0, 5), pady=(0, 5))
+        ttk.Label(f, text="Y:").grid(row=0, column=2, sticky="nw", padx=(5, 1), pady=(2, 4))
+        o = ttk.OptionMenu(f, self.ylocator, self.ylocator.get(),
+                           *self.locators.keys())
+        o.config(width=w)
+        o.grid(row=0, column=3, sticky="new", padx=(0, 5), pady=(0, 5))
+        f.columnconfigure(1, weight=1)
+        f.columnconfigure(3, weight=1)
+        f.rowconfigure(0, weight=1)
+        f.grid(row=1, column=0, sticky="new", padx=7, pady=7)
+
+        # Formatters
+        f = ttk.LabelFrame(self, text="Tick Formats")
+        ttk.Label(f, text="X:").grid(row=0, column=0, sticky="nw", padx=(5, 1), pady=(2, 4))
+        o = ttk.OptionMenu(f, self.xformatter, self.xformatter.get(),
+                           *self.formatters.keys())
+        o.config(width=w)
+        o.grid(row=0, column=1, sticky="new", padx=(0, 5), pady=(0, 5))
+        ttk.Label(f, text="Y:").grid(row=0, column=2, sticky="nw", padx=(5, 1), pady=(2, 4))
+        o = ttk.OptionMenu(f, self.yformatter, self.yformatter.get(),
+                           *self.formatters.keys())
+        o.config(width=w)
+        o.grid(row=0, column=3, sticky="new", padx=(0, 5), pady=(0, 5))
+        f.columnconfigure(1, weight=1)
+        f.columnconfigure(3, weight=1)
+        f.rowconfigure(0, weight=1)
+        f.grid(row=2, column=0, sticky="new", padx=7, pady=7)
+
+        # MinorLocators
+        f = ttk.LabelFrame(self, text="Minor Tick Locations")
+        ttk.Label(f, text="X:").grid(row=0, column=0, sticky="nw", padx=(5, 1), pady=(2, 4))
+        o = ttk.OptionMenu(f, self.xmlocator, self.xmlocator.get(),
+                           *self.mlocators.keys())
+        o.config(width=w)
+        o.grid(row=0, column=1, sticky="new", padx=(0, 5), pady=(0, 5))
+        ttk.Label(f, text="Y:").grid(row=0, column=2, sticky="nw", padx=(5, 1), pady=(2, 4))
+        o = ttk.OptionMenu(f, self.ymlocator, self.ymlocator.get(),
+                           *self.mlocators.keys())
+        o.config(width=w)
+        o.grid(row=0, column=3, sticky="new", padx=(0, 5), pady=(0, 5))
+        f.columnconfigure(1, weight=1)
+        f.columnconfigure(3, weight=1)
+        f.rowconfigure(0, weight=1)
+        f.grid(row=3, column=0, sticky="new", padx=7, pady=7)
+
+        # Apply, Ok, Cancel
+        f2 = ttk.Frame(self)
+        ttk.Button(f2, text="Apply", command=self.apply).grid(row=0, column=0, sticky="ne")
+        ttk.Button(f2, text="Ok", command=self.ok).grid(row=0, column=1, sticky="ne")
+        ttk.Button(f2, text="Cancel", command=self.destroy).grid(row=0, column=2, sticky="ne")
+        f2.grid(row=4, column=0, sticky="se", padx=4, pady=4)
+
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        for w in f2.winfo_children():
+            w.grid_configure(padx=3, pady=3)
+
+        self.focus_force()
+
+    def apply(self):
+        """Apply the edits, returning True if successful."""
+        try:
+            if self.xscale.get():
+                self.ax.set_xscale(self.scales[self.xscale.get()])
+            if self.yscale.get():
+                self.ax.set_yscale(self.scales[self.yscale.get()])
+
+            if self.xlocator.get():
+                xl = self.locators[self.xlocator.get()]()
+                self.ax.xaxis.set_major_locator(xl)
+            if self.ylocator.get():
+                yl = self.locators[self.ylocator.get()]()
+                self.ax.yaxis.set_major_locator(yl)
+
+            if issubclass(self.locators[self.xlocator.get()], dates.DateLocator):
+                self.ax.xaxis.set_major_formatter(self.formatters[self.xformatter.get()](xl))
+            elif self.xformatter.get():
+                self.ax.xaxis.set_major_formatter(self.formatters[self.xformatter.get()]())
+            if issubclass(self.locators[self.ylocator.get()], dates.DateLocator):
+                self.ax.yaxis.set_major_formatter(self.formatters[self.yformatter.get()](yl))
+            elif self.yformatter.get():
+                self.ax.yaxis.set_major_formatter(self.formatters[self.yformatter.get()]())
+
+            if self.xmlocator.get():
+                self.ax.xaxis.set_minor_locator(self.mlocators[self.xmlocator.get()]())
+            if self.ymlocator.get():
+                self.ax.yaxis.set_minor_locator(self.mlocators[self.ymlocator.get()]())
+
+            self.root.draw()
+        except Exception:
+            self.root.bell()
+            raise
+        return True
+
+    def ok(self):
+        if self.apply():
+            self.destroy()
+
+
 class _LineOptions(ttk.Frame):
     """A frame with options for a plotted line."""
 
@@ -507,30 +659,16 @@ class Window(tk.Tk):
         menu.add_cascade(label="File", menu=m)
 
         # Format
-        self.xminorticks = tk.BooleanVar()
-        self.yminorticks = tk.BooleanVar()
         self.showgrid = tk.BooleanVar()
         self.aspectratio = tk.StringVar(value=ax.get_aspect())
-        self.xscale = tk.StringVar(value=ax.get_xscale())
-        self.yscale = tk.StringVar(value=ax.get_yscale())
         self.dorescale = tk.BooleanVar()
         m = tk.Menu(menu, tearoff=0)
-        m.add_checkbutton(label="Minorticks X-Axis",
-                          command=self.setxticks, variable=self.xminorticks)
-        m.add_checkbutton(label="Minorticks Y-Axis",
-                          command=self.setyticks, variable=self.yminorticks)
+        m.add_command(label="Configure Axes", command=lambda: AxesOptions(self, ax))
         m.add_checkbutton(label="Grid",
                           command=self.setgrid, variable=self.showgrid)
         m.add_checkbutton(label="Equal Aspect Ratio",
                           onvalue="equal", offvalue="auto",
                           command=self.setaspect, variable=self.aspectratio)
-        m.add_separator()
-        m.add_checkbutton(label="Logarithmic X-Axis",
-                          onvalue="log", offvalue="linear",
-                          command=self.setxscale, variable=self.xscale)
-        m.add_checkbutton(label="Logarithmic Y-Axis",
-                          onvalue="log", offvalue="linear",
-                          command=self.setyscale, variable=self.yscale)
         m.add_separator()
         m.add_checkbutton(label="Auto-Rescale Axes",
                           command=self.draw, variable=self.dorescale)
@@ -591,6 +729,7 @@ class Window(tk.Tk):
 
     def load(self):
         """Load pre-selected files and data."""
+        self.focus_force()
         for line in ax.lines:
             _LineOptions(self, self.notebook, line)
 
@@ -666,24 +805,6 @@ class Window(tk.Tk):
         ax.set_ylabel(self.ylabel.get())
         self.draw()
 
-    def setxscale(self, *_):
-        """Update the graph's x-axis scale."""
-        ax.set_xscale(self.xscale.get())
-        if self.xscale.get() == "log":
-            self.xminorticks.set(True)
-            self.draw()
-        else:
-            self.setxticks()
-
-    def setyscale(self, *_):
-        """Update the graph's y-axis scale."""
-        ax.set_yscale(self.yscale.get())
-        if self.yscale.get() == "log":
-            self.yminorticks.set(True)
-            self.draw()
-        else:
-            self.setyticks()
-
     def setaspect(self):
         """Update the graph's aspect ratio."""
         ax.set_aspect(self.aspectratio.get())
@@ -692,22 +813,6 @@ class Window(tk.Tk):
     def setgrid(self):
         """Update the graph's grid."""
         ax.grid(self.showgrid.get())
-        self.draw()
-
-    def setxticks(self):
-        """Update whether the graph has x minorticks."""
-        if self.xminorticks.get():
-            ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
-        else:
-            ax.xaxis.set_minor_locator(ticker.NullLocator())
-        self.draw()
-
-    def setyticks(self):
-        """Update whether the graph has y minorticks."""
-        if self.yminorticks.get():
-            ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
-        else:
-            ax.yaxis.set_minor_locator(ticker.NullLocator())
         self.draw()
 
     def reloadfiles(self, *_):
@@ -743,7 +848,7 @@ class Window(tk.Tk):
         return False
 
     def destroy(self):
-        """Close the window."""
+        """Close the window. If plot was edited, show save/close dialog."""
         if self.isedited and not self.notebook.isempty:
             response = askquestion(title="Plo.Py",
                                    message="Save plot before closing?",
@@ -845,9 +950,12 @@ def start():
     for file in sys.argv[1:]:
         add_file(file)
 
+    # differentiate this from python.exe by giving it a unique id
+    # (gets icon to show up in taskbar on windows)
     try:
         from ctypes import windll
-        windll.shell32.SetCurrentProcessExplicitAppUserModelID("plopy")
+        from random import random
+        windll.shell32.SetCurrentProcessExplicitAppUserModelID("plopy.{}".format(random()))
     except Exception:
         pass
 
