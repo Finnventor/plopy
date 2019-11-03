@@ -372,7 +372,10 @@ class DateParserOptions(tk.Toplevel):
 
 
 class AxesOptions(tk.Toplevel):
-    """Window for configuring axes."""
+    """
+    Window for configuring axes.
+    `callback` will be called after configuration is applied.
+    """
     scales = {"Linear": "linear", "Logarithmic": "log"}
     locators = {"None": ticker.NullLocator, "Auto": ticker.AutoLocator,
                 "Logarithmic": ticker.LogLocator, "Date": dates.AutoDateLocator}
@@ -718,8 +721,9 @@ class Window(tk.Tk):
         m.add_command(label="Reload Data", command=self.reloadfiles)
         m.add_command(label="Save Image", command=self.savefile)
         m.add_separator()
-        self.parseroptions = dateparser.parserinfo(dayfirst=False, yearfirst=True)
-        m.add_command(label="Configure Parsing", command=lambda: DateParserOptions(self, self.setparseroptions))
+        self.parseroptions = dateparser.parserinfo(yearfirst=True)  # Y, M, D
+        m.add_command(label="Configure Parsing", command=lambda:
+            DateParserOptions(self, self.setparseroptions))
         menu.add_cascade(label="File", menu=m)
 
         # Format
