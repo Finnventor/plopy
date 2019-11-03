@@ -4,6 +4,7 @@ from __future__ import print_function, division
 
 import sys
 from os.path import basename, isfile
+from dateutil import parser as dateparser
 
 
 from matplotlib import use
@@ -36,19 +37,22 @@ _icon_base64 = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAD1BMVEU9S8398wXF
 _root = None
 
 
-def array_from_file(filename):
-    """Get a 2D numpy array of float from a file."""
+def array_from_file(filename, dateparserinfo=None):
+    """Get a 2D numpy array of float (or date, with dateutil.parser) from a file."""
     data = []
     try:
         with open(filename) as file:
             for line in file:
                 line = line.replace(",", " ")
                 row = []
-                for num in line.split():
+                for val in line.split():
                     try:
-                        row.append(float(num))
+                        row.append(float(val))
                     except ValueError:
-                        break
+                        try:
+                            row.append(dates.date2num(dateparser.parse(val, dateparserinfo)))
+                        except Exception:
+                            break
                 if len(row) > 1:
                     data.append(row)
         return np.array(data)
@@ -315,8 +319,60 @@ class _FileView(_ArrayView):
         self.string.set(self.original)
 
 
+class DateParserOptions(tk.Toplevel):
+    """
+    Window for configuring a datetime.parser
+    `callback` will be called with a `parserinfo` with the configuration.
+    """
+    parameters = {"Year Month Day": {"dayfirst":False, "yearfirst": True},
+                  "Day Month Year": {"dayfirst":True, "yearfirst": False},
+                  "Month Day Year": {"dayfirst":False, "yearfirst": False},
+                  "Year Day Month": {"dayfirst":True, "yearfirst": True}}
+
+    def __init__(self, root, callback, *args, **kwargs):
+        tk.Toplevel.__init__(self, root, *args, **kwargs)
+        self.title("Plo.Py")
+        self.tk.call('wm', 'iconphoto', self._w,
+                     tk.PhotoImage(master=self, data=_icon_base64))
+        self.resizable(False, False)
+        self.root = root
+        self.callback = callback
+
+        self.format = tk.StringVar(value=tuple(self.parameters.keys())[0])
+
+        w = 25
+
+        f = ttk.LabelFrame(self, text="Date Format")
+        o = ttk.OptionMenu(f, self.format, self.format.get(),
+                           *self.parameters.keys())
+        o.config(width=w)
+        o.grid(row=0, column=0, sticky="new", padx=5, pady=5)
+
+        f.columnconfigure(0, weight=1)
+        f.rowconfigure(0, weight=1)
+        f.grid(row=0, column=0, sticky="new", padx=7, pady=7)
+
+        # Ok, Cancel
+        f2 = ttk.Frame(self)
+        ttk.Button(f2, text="Ok", command=self.ok).grid(row=0, column=1, sticky="ne")
+        ttk.Button(f2, text="Cancel", command=self.destroy).grid(row=0, column=2, sticky="ne")
+        f2.grid(row=4, column=0, sticky="se", padx=4, pady=4)
+
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        for w in f2.winfo_children():
+            w.grid_configure(padx=3, pady=3)
+
+        self.focus_force()
+
+    def ok(self):
+        self.callback(dateparser.parserinfo(**self.parameters[self.format.get()]))
+        self.destroy()
+
+
 class AxesOptions(tk.Toplevel):
-    """Options for configuring axes."""
+    """Window for configuring axes."""
     scales = {"Linear": "linear", "Logarithmic": "log"}
     locators = {"None": ticker.NullLocator, "Auto": ticker.AutoLocator,
                 "Logarithmic": ticker.LogLocator, "Date": dates.AutoDateLocator}
@@ -326,13 +382,17 @@ class AxesOptions(tk.Toplevel):
                   "Date": dates.AutoDateFormatter}
 
     mlocators = {"None": ticker.NullLocator, "Auto": ticker.AutoMinorLocator}
-    def __init__(self, root, ax, *args, **kwargs):
+    def __init__(self, root, ax, callback=None, *args, **kwargs):
         tk.Toplevel.__init__(self, root, *args, **kwargs)
         self.title("Plo.Py - Configure Axes")
         self.tk.call('wm', 'iconphoto', self._w,
                      tk.PhotoImage(master=self, data=_icon_base64))
+        self.resizable(False, False)
         self.root = root
         self.ax = ax
+        self.callback = callback
+
+        # Define tkinter variables and set default as current state
         self.xscale = tk.StringVar(value=next((k for k, v in self.scales.items() if v == ax.xaxis.get_scale()), ""))
         self.yscale = tk.StringVar(value=next((k for k, v in self.scales.items() if v == ax.yaxis.get_scale()), ""))
         self.xlocator = tk.StringVar(value=next((k for k, v in self.locators.items() if v == type(ax.xaxis.get_major_locator())), ""))
@@ -456,7 +516,8 @@ class AxesOptions(tk.Toplevel):
             if self.ymlocator.get():
                 self.ax.yaxis.set_minor_locator(self.mlocators[self.ymlocator.get()]())
 
-            self.root.draw()
+            if self.callback:
+                self.callback()
         except Exception:
             self.root.bell()
             raise
@@ -656,6 +717,9 @@ class Window(tk.Tk):
         m.add_command(label="Load Data", command=self.selectfile)
         m.add_command(label="Reload Data", command=self.reloadfiles)
         m.add_command(label="Save Image", command=self.savefile)
+        m.add_separator()
+        self.parseroptions = dateparser.parserinfo(dayfirst=False, yearfirst=True)
+        m.add_command(label="Configure Parsing", command=lambda: DateParserOptions(self, self.setparseroptions))
         menu.add_cascade(label="File", menu=m)
 
         # Format
@@ -663,7 +727,8 @@ class Window(tk.Tk):
         self.aspectratio = tk.StringVar(value=ax.get_aspect())
         self.dorescale = tk.BooleanVar()
         m = tk.Menu(menu, tearoff=0)
-        m.add_command(label="Configure Axes", command=lambda: AxesOptions(self, ax))
+        m.add_command(label="Configure Axes", command=lambda:
+            AxesOptions(self, ax, callback=self.draw))
         m.add_checkbutton(label="Grid",
                           command=self.setgrid, variable=self.showgrid)
         m.add_checkbutton(label="Equal Aspect Ratio",
@@ -756,7 +821,7 @@ class Window(tk.Tk):
     def addfiles(self, filenames):
         """Add a file to be parsed and plotted."""
         for filename in filenames:
-            filecontent = array_from_file(filename)
+            filecontent = array_from_file(filename, self.parseroptions)
             if len(filecontent.shape) != 2:
                 print("Could not parse", basename(filename))
                 self.bell()
@@ -815,11 +880,14 @@ class Window(tk.Tk):
         ax.grid(self.showgrid.get())
         self.draw()
 
+    def setparseroptions(self, parseroptions):
+        self.parseroptions = parseroptions
+
     def reloadfiles(self, *_):
         """Re-parse all loaded files, then update the graph."""
         for pane in self.notebook.winfo_children():
             if isinstance(pane, _LineFileOptions):
-                pane.data = array_from_file(pane.filename)
+                pane.data = array_from_file(pane.filename, self.parseroptions)
                 pane.updatexcolumn()
                 pane.updateycolumn()
 
