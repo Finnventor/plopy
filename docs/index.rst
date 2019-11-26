@@ -1,22 +1,25 @@
 plopy
 =====
-A program for making high-quality data plotting with matplotlib easily
-customizable with a GUI.
+A program for making data plotting with matplotlib easily customizable in a GUI.
 
 Installation
 ------------
 After installing `Python 3
-<https://python.org/downloads/>`_, run ``pip install plopy``
+<https://python.org/downloads/>`_, run the command ``pip install plopy``
 
-You can also download the `standalone version
+Another option is downloading the `standalone version
 <https://raw.githubusercontent.com/Finnventor/plopy/master/__init__.py>`_,
 but this is not recommended.
+
+You can also `try it online
+<https://repl.it/@Finnventor/import-plopy-demo?lite=true>`_ on repl.it
+(this may load slowly, though).
 
 Usage
 -----
 To open the GUI, run the command ``python -m plopy``. If desired,
 preselect files by appending their paths to the command
-(``python -m plopy data.csv log.txt``... ).
+(``python -m plopy data.csv log.txt`` ... ).
 
 plopy can also be controlled from a script.
 Use ``plopy.add_file(filename)`` and ``plopy.add_array(array, name)``,

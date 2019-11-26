@@ -1,2 +1,3 @@
 import plopy
-plopy.start()
+if __name__ == '__main__':
+    plopy.start()
