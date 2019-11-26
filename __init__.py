@@ -697,7 +697,7 @@ class _LineFileOptions(_LineColumnOptions):
         _FileView(self.root, self.data, self.filename)
 
 
-class Window(tk.Tk):
+class _Window(tk.Tk):
     """The main plopy window. Use start() to open."""
 
     def __init__(self, *args, **kwargs):
@@ -941,8 +941,9 @@ ax = fig.add_subplot(111)
 
 _files_to_load = []
 _data_to_load = {}
-suppress_errors = False
 
+suppress_errors = False
+"""bool; whether to hide errors and other output from add_file and add_array"""
 
 def add_file(filename):
     """
@@ -1014,8 +1015,8 @@ def add_array(array, name):
 
 def start():
     """
-    Open the GUI. Note that this function should always be called last;
-    the program exits after this.
+    Open the GUI.
+    Note that this function should be called after preselecting data.
     """
     global _root
 
@@ -1031,12 +1032,12 @@ def start():
     except Exception:
         pass
 
-    _root = Window()
+    _root = _Window()
     # set sizes
     _root.update()
     _root.minsize(_root.winfo_width()-100, _root.winfo_height()-10)
-    exit(_root.mainloop())
+    return _root.mainloop()
 
 
 if __name__ == "__main__":
-    start()
+    exit(start())

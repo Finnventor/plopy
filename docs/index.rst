@@ -2,6 +2,16 @@ plopy
 =====
 A program for making data plotting with matplotlib easily customizable in a GUI.
 
+Features
+--------
+
+- Intelligent data file parsing
+- Support for dates in input using ``dateutil.parser``
+- Graph configuration: line style, color, points
+- Custom axes scale and tick locations
+- Supports all output formats supported by ``matplotlib``
+  (``.png``, ``.jpg``, ``.pdf`` ... )
+
 Installation
 ------------
 After installing `Python 3
@@ -29,3 +39,10 @@ If you're already accustomed to matplotlib, or want to convert pre-existing
 programs, you can use ``plopy.fig`` and ``plopy.ax`` to plot on, and call
 ``plopy.start()`` when done. This method also works in combination with the
 previous one.
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :glob:
+
+   *
