@@ -943,27 +943,25 @@ _files_to_load = []
 _data_to_load = {}
 
 suppress_errors = False
-"""bool; whether to hide errors and other output from add_file and add_array"""
+"""bool: Whether to hide errors and other output from add_file and add_array"""
 
 def add_file(filename):
     """
-    Add a file to be loaded (with at least 2 columns).
-
-    A column can be chosen to be plotted against another column.
+    Add a file to be loaded.
 
     Parameters
     ----------
-    filename : The file to be loaded
+    filename : str
+        The file to be loaded (should be 2d).
 
     Returns
     -------
     success : bool
-        True if successful, false otherwise. Errors may be printed.
+        True if successful, false otherwise.
 
-    See Also
-    --------
-    add_array() : Add a 2D array to be loaded
-    suppress_errors: bool; whether to print errors from this function.
+    Notes
+    -----
+        `filename` should have at least 2 rows and 2 columns.
     """
     if isfile(filename):
         _files_to_load.append(filename)
@@ -975,14 +973,12 @@ def add_file(filename):
 
 def add_array(array, name):
     """
-    Add an array to be loaded (with at least 2 columns).
-
-    A column can be chosen to be plotted against another column.
+    Add an array to be loaded.
 
     Parameters
     ----------
-    array : np.array or list-like of float
-        The data to be loaded.
+    array : np.array or list-like of list-like of float
+        The data to be loaded (should be 2d).
     name : str
         The name to be used for the tab. Must be unique,
         or it will overwrite another array.
@@ -990,12 +986,11 @@ def add_array(array, name):
     Returns
     -------
     success : bool
-        True if successful, false otherwise. Errors may be printed.
+        True if successful, false otherwise.
 
-    See Also
-    --------
-    add_file() : Add a file to be loaded.
-    suppress_errors : bool; whether to print errors from this function.
+    Notes
+    -----
+        `array` should have at least 2 rows and 2 columns.
     """
     try:
         array = np.array(array)
