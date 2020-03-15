@@ -42,7 +42,6 @@ previous one.
 
 .. toctree::
    :hidden:
-   index
    :maxdepth: 2
    :glob:
 
