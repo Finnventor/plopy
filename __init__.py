@@ -730,6 +730,7 @@ class _Window(tk.Tk):
         self.showgrid = tk.BooleanVar()
         self.aspectratio = tk.StringVar(value=ax.get_aspect())
         self.dorescale = tk.BooleanVar()
+        self.dodraw = tk.BooleanVar(value=True)
         m = tk.Menu(menu, tearoff=0)
         m.add_command(label="Configure Axes", command=lambda:
             AxesOptions(self, ax, callback=self.draw))
@@ -844,7 +845,7 @@ class _Window(tk.Tk):
 
     def update(self):
         """Update the _MplCanvas."""
-        if self.dorescale.get():
+        if self.dorescale.get() and self.dodraw.get():
             ax.relim()
             ax.autoscale()
 
@@ -852,12 +853,13 @@ class _Window(tk.Tk):
 
     def draw(self):
         """Redraw the _MplCanvas."""
-        handles, labels = ax.get_legend_handles_labels()
-        if labels:
-            ax.legend(handles, labels)
+        if self.dodraw.get():
+            handles, labels = ax.get_legend_handles_labels()
+            if labels:
+                ax.legend(handles, labels)
 
-        self.canvas.draw()
-        self.isedited = True
+            self.canvas.draw()
+            self.isedited = True
 
     def settitle(self, *_):
         """Update the graph's title."""
@@ -932,6 +934,7 @@ class _Window(tk.Tk):
             elif response == "cancel":
                 return
 
+        self.dodraw.set(False)
         tk.Tk.destroy(self)
 
 
