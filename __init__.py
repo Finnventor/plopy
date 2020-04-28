@@ -5,7 +5,7 @@ from __future__ import print_function, division
 import sys
 from os.path import basename, isfile
 from dateutil import parser as dateparser
-
+from traceback import format_exc
 
 from matplotlib import use
 use("TkAgg")
@@ -19,13 +19,14 @@ import numpy as np
 try:  # Python 3
     import tkinter as tk
     from tkinter import ttk
-    from tkinter.messagebox import askquestion
+    from tkinter.messagebox import askquestion, showerror
     from tkinter.filedialog import askopenfilenames, asksaveasfilename
     from tkinter.colorchooser import askcolor
     from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk as Navigation
 except ImportError:  # Python 2
     import Tkinter as tk
     import ttk
+    from tkMessageBox import askquestion, error
     from tkFileDialog import askopenfilenames, asksaveasfilename
     from tkColorChooser import askcolor
     from matplotlib.backends.backend_tkagg import NavigationToolbar2TkAgg as Navigation
@@ -369,6 +370,117 @@ class DateParserOptions(tk.Toplevel):
     def ok(self):
         self.callback(dateparser.parserinfo(**self.parameters[self.format.get()]))
         self.destroy()
+
+
+class LoadOptions(tk.Toplevel):
+    """Window with options for `np.loadtxt` and a file selection dialog.
+    Calls `callback(filecontent, filename)`."""
+    def __init__(self, root, callback, dateparseroptions=None, *args, **kwargs):
+        self.root = root
+        self.callback = callback
+        self.dateparseroptions = dateparseroptions
+        tk.Toplevel.__init__(self, root, *args, **kwargs, padx=5, pady=5)
+
+        self.tk.call('wm', 'iconphoto', self._w,
+                     tk.PhotoImage(master=self, data=_icon_base64))
+
+        f = ttk.Frame(self)
+        ttk.Label(f, text="Skiprows:").grid(row=1, column=0, sticky="nw")
+        self.skiprows = ttk.Spinbox(f, from_=0, to=float("inf"))
+        self.skiprows.grid(row=1, column=1, sticky="nwe")
+        self.skiprows.set(0)
+        _ToolTip(self.skiprows, "How many rows to ignore at the beginning of the file.")
+
+        ttk.Label(f, text="Max rows:").grid(row=2, column=0, sticky="nw")
+        self.maxrows = ttk.Spinbox(f, from_=0, to=float("inf"))
+        self.maxrows.grid(row=2, column=1, sticky="nwe")
+        _ToolTip(self.maxrows, "How many rows of the file to read (after skiprows).\nLeave blank to read all of them.")
+
+        ttk.Label(f, text="Delimiter:").grid(row=3, column=0, sticky="nw")
+        self.delim = ttk.Entry(f)
+        self.delim.grid(row=3, column=1, sticky="nwe")
+        _ToolTip(self.delim, "The characters in between data values.\nLeave blank for whitespace.")
+
+        ttk.Label(f, text="Date columns:").grid(row=4, column=0, sticky="nw")
+        self.datecols = ttk.Entry(f)
+        self.datecols.grid(row=4, column=1, sticky="nwe")
+        _ToolTip(self.datecols, "The column numbers (starting from 1) with date values, seperated by spaces and/or commas.")
+
+        f.grid(row=0, column=0, sticky="nwe")
+        for w in f.winfo_children():
+            w.grid_configure(padx=3, pady=3)
+
+        f.columnconfigure(1, weight=1)
+
+        f = ttk.Frame(self)
+        ttk.Button(f, text="Select Files", command=self.select).grid(row=0, column=0, sticky="ne")
+        ttk.Button(f, text="Cancel", command=self.destroy).grid(row=0, column=1, sticky="ne")
+        f.grid(row=4, column=0, sticky="se")
+
+        for w in f.winfo_children():
+            w.grid_configure(padx=3, pady=3)
+
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        self.focus_force()
+
+    def select(self):
+        try:
+            skiprows = int(self.skiprows.get() or 0)
+        except ValueError:
+            self.skiprows.focus()
+            self.root.bell()
+            return
+
+        try:
+            maxrows = int(self.maxrows.get() or 0) or None
+        except ValueError:
+            self.maxrows.focus()
+            self.root.bell()
+            return
+
+        delim = self.delim.get() or None
+
+        datecols = self.datecols.get().replace(",", " ").strip()
+        converters = {}
+        if datecols:
+            try:
+                for col in datecols:
+                    converters[int(col)-1] = self.parse_date
+            except Exception as e:
+                raise
+
+        filenames = askopenfilenames(title="Plo.Py - Select Files",
+                                     filetypes=[('Data files', '.txt'),
+                                                ('Data files', '.dat'),
+                                                ('Data files', '.csv'),
+                                                ('All Files', '*')])
+
+        if filenames:
+            errors = False
+
+            for filename in filenames:
+                try:
+                    data = np.loadtxt(filename, skiprows=skiprows, max_rows=maxrows,
+                                      delimiter=delim, converters=converters)
+                    assert data.size > 0
+
+                except Exception as e:
+                    errors = True
+                    print("Could not load", filename)
+                    showerror(type(e).__name__, format_exc())
+                    continue
+
+                self.callback(data, filename)
+
+            if errors:
+                self.focus_force()
+            else:
+                self.destroy()
+
+    def parse_date(self, string):
+        return dates.date2num(dateparser.parse(string, self.dateparseroptions))
 
 
 class AxesOptions(tk.Toplevel):
@@ -718,6 +830,7 @@ class _Window(tk.Tk):
         # File
         m = tk.Menu(menu, tearoff=0)
         m.add_command(label="Load Data", command=self.selectfile)
+        m.add_command(label="Load Data (Advanced)", command=lambda: LoadOptions(self, self.addfile))
         m.add_command(label="Reload Data", command=self.reloadfiles)
         m.add_command(label="Save Image", command=self.savefile)
         m.add_separator()
@@ -814,6 +927,14 @@ class _Window(tk.Tk):
                            array)
         self.update()
 
+    def addfile(self, array, filename):
+        """Add a file's contents to be plotted."""
+        _LineFileOptions(self, self.notebook,
+                         ax.plot(array[:, 0], array[:, 1],
+                                 label=basename(filename))[0],
+                         array, filename)
+        self.update()
+
     def selectfile(self, *_):
         """Open a file selection dialog, then send the output to .addfiles()"""
         filenames = askopenfilenames(title="Plo.Py - Add Files",
@@ -824,7 +945,7 @@ class _Window(tk.Tk):
         self.addfiles(filenames)
 
     def addfiles(self, filenames):
-        """Add a file to be parsed and plotted."""
+        """Add one or more filenames to be parsed and plotted."""
         for filename in filenames:
             filecontent = array_from_file(filename, self.parseroptions)
             if len(filecontent.shape) != 2:
@@ -832,16 +953,11 @@ class _Window(tk.Tk):
                 self.bell()
                 continue
 
-            _LineFileOptions(
-                self, self.notebook,
-                ax.plot(filecontent[:, 0], filecontent[:, 1],
-                        label=basename(filename))[0],
-                filecontent, filename)
+            self.addfile(filecontent, filename)
 
         if filenames:
             if not self.titlevar.get():
                 self.titlevar.set(basename(filenames[0]))
-            self.update()
 
     def update(self):
         """Update the _MplCanvas."""
