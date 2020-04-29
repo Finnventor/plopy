@@ -406,6 +406,9 @@ class LoadOptions(tk.Toplevel):
         self.datecols.grid(row=4, column=1, sticky="nwe")
         _ToolTip(self.datecols, "The column numbers (starting from 1) with date values, seperated by spaces and/or commas.")
 
+        ttk.Button(f, text="Select Date Format", command=lambda:
+            DateParserOptions(self, self.setparseroptions)).grid(row=5, column=0, columnspan=2, sticky="nw")
+
         f.grid(row=0, column=0, sticky="nwe")
         for w in f.winfo_children():
             w.grid_configure(padx=3, pady=3)
@@ -478,6 +481,9 @@ class LoadOptions(tk.Toplevel):
                 self.focus_force()
             else:
                 self.destroy()
+
+    def setparseroptions(self, dateparseroptions):
+        self.dateparseroptions = dateparseroptions
 
     def parse_date(self, string):
         return dates.date2num(dateparser.parse(string, self.dateparseroptions))
@@ -829,12 +835,12 @@ class _Window(tk.Tk):
         menu = tk.Menu(self)
         # File
         m = tk.Menu(menu, tearoff=0)
+        self.parseroptions = dateparser.parserinfo(yearfirst=True)  # Y, M, D
         m.add_command(label="Load Data", command=self.selectfile)
-        m.add_command(label="Load Data (Advanced)", command=lambda: LoadOptions(self, self.addfile))
+        m.add_command(label="Load Data (Advanced)", command=lambda: LoadOptions(self, self.addfile, self.parseroptions))
         m.add_command(label="Reload Data", command=self.reloadfiles)
         m.add_command(label="Save Image", command=self.savefile)
         m.add_separator()
-        self.parseroptions = dateparser.parserinfo(yearfirst=True)  # Y, M, D
         m.add_command(label="Configure Parsing", command=lambda:
             DateParserOptions(self, self.setparseroptions))
         menu.add_cascade(label="File", menu=m)
