@@ -848,9 +848,13 @@ class _Window(tk.Tk):
         # Format
         self.showgrid = tk.BooleanVar()
         self.aspectratio = tk.StringVar(value=ax.get_aspect())
+        self.legend_loc = tk.StringVar(value="best")
         self.dorescale = tk.BooleanVar()
         self.dodraw = tk.BooleanVar(value=True)
+
         m = tk.Menu(menu, tearoff=0)
+        m_loc = tk.Menu(m)
+
         m.add_command(label="Configure Axes", command=lambda:
             AxesOptions(self, ax, callback=self.draw))
         m.add_checkbutton(label="Grid",
@@ -858,6 +862,23 @@ class _Window(tk.Tk):
         m.add_checkbutton(label="Equal Aspect Ratio",
                           onvalue="equal", offvalue="auto",
                           command=self.setaspect, variable=self.aspectratio)
+
+        m_loc.add_radiobutton(label="Auto", value="best", variable=self.legend_loc, command=self.draw)
+        m_loc.add_separator()
+        m_loc.add_radiobutton(label="Top Right", value="upper right", variable=self.legend_loc, command=self.draw)
+        m_loc.add_radiobutton(label="Top Left", value="upper left", variable=self.legend_loc, command=self.draw)
+        m_loc.add_radiobutton(label="Bottom Left", value="lower left", variable=self.legend_loc, command=self.draw)
+        m_loc.add_radiobutton(label="Bottom Right", value="lower right", variable=self.legend_loc, command=self.draw)
+        m_loc.add_separator()
+        m_loc.add_radiobutton(label="Left", value="center left", variable=self.legend_loc, command=self.draw)
+        m_loc.add_radiobutton(label="Right", value="center right", variable=self.legend_loc, command=self.draw)
+        m_loc.add_radiobutton(label="Top", value="upper center", variable=self.legend_loc, command=self.draw)
+        m_loc.add_radiobutton(label="Bottom", value="lower center", variable=self.legend_loc, command=self.draw)
+        m_loc.add_separator()
+        m_loc.add_radiobutton(label="Center", value="center", variable=self.legend_loc, command=self.draw)
+
+        m.add_cascade(label="Legend Location", menu=m_loc)
+
         m.add_separator()
         m.add_checkbutton(label="Auto-Rescale Axes",
                           command=self.draw, variable=self.dorescale)
@@ -967,18 +988,19 @@ class _Window(tk.Tk):
 
     def update(self):
         """Update the _MplCanvas."""
-        if self.dorescale.get() and self.dodraw.get():
-            ax.relim()
-            ax.autoscale()
+        if self.dodraw.get():
+            if self.dorescale.get():
+                ax.relim()
+                ax.autoscale()
 
-        self.draw()
+            self.draw()
 
     def draw(self):
         """Redraw the _MplCanvas."""
         if self.dodraw.get():
             handles, labels = ax.get_legend_handles_labels()
             if labels:
-                ax.legend(handles, labels)
+                ax.legend(handles, labels, loc=self.legend_loc.get())
 
             self.canvas.draw()
             self.isedited = True
