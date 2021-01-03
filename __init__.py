@@ -143,7 +143,9 @@ class ParserOptionsDialog(QDialog):
                        {"dayfirst":False, "yearfirst": False},  # MDY
                        {"dayfirst":True, "yearfirst": True}]    # YDM
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs, windowFlags=Qt.WindowCloseButtonHint)  # hide ? button
+        super().__init__(*args, **kwargs)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)  # hide ? button
+
         self.ui = Ui_ParserOptionsDialog()
         self.ui.setupUi(self)
 
@@ -826,7 +828,7 @@ class MainWindow(QMainWindow):
 
         self.show()
         qapp.processEvents()
-        self.adv_load_dialog = AdvancedLoadDialog()
+        self.adv_load_dialog = AdvancedLoadDialog(self)
         self.figoptions = FigureDialog(self, self.axes_list)
         self.ui.action_figure_options.triggered.connect(self.figoptions.show)
         nav.edit_parameters = self.figoptions.show
@@ -910,7 +912,7 @@ class MainWindow(QMainWindow):
         qapp.clipboard().setImage(QImage.fromData(buffer.getvalue()))
 
     def configure_parser(self):
-        d = ParserOptionsDialog()
+        d = ParserOptionsDialog(self)
         d.exec_()
         d.deleteLater()
 

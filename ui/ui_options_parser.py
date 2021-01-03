@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'options_parserFeeMKK.ui'
+## Form generated from reading UI file 'options_parsereXutiA.ui'
 ##
 ## Created by: Qt User Interface Compiler version 5.15.0
 ##
@@ -21,7 +21,6 @@ class Ui_ParserOptionsDialog(object):
         if not ParserOptionsDialog.objectName():
             ParserOptionsDialog.setObjectName(u"ParserOptionsDialog")
         ParserOptionsDialog.resize(174, 100)
-        ParserOptionsDialog.setModal(True)
         self.verticalLayout_2 = QVBoxLayout(ParserOptionsDialog)
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
         self.date_format_frame = QGroupBox(ParserOptionsDialog)
