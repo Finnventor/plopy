@@ -13,6 +13,13 @@
   <property name="windowTitle">
    <string>Plo.Py</string>
   </property>
+  <property name="windowIcon">
+   <iconset theme="plopy_16x16.png">
+    <normaloff>.</normaloff>.</iconset>
+  </property>
+  <property name="animated">
+   <bool>false</bool>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <property name="spacing">
@@ -46,143 +53,140 @@
      <height>21</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menuFile">
+   <widget class="QMenu" name="menu_file">
     <property name="title">
      <string>&amp;File</string>
     </property>
-    <addaction name="actionOpen_Data_File"/>
-    <addaction name="actionSave_Plot"/>
+    <addaction name="action_load_data_file"/>
+    <addaction name="action_load_data_file_set_format"/>
+    <addaction name="action_load_data_file_advanced"/>
+    <addaction name="action_save_plot"/>
+    <addaction name="action_copy_plot"/>
    </widget>
-   <widget class="QMenu" name="menuEdit">
+   <widget class="QMenu" name="menu_edit">
     <property name="title">
      <string>Edit</string>
     </property>
-    <widget class="QMenu" name="menuPlot_Options">
-     <property name="title">
-      <string>Plot Options</string>
+    <widget class="QMenu" name="menu_plot_options">
+     <property name="statusTip">
+      <string>Options relating to a specific file or line, including the color or legend label</string>
      </property>
-     <addaction name="actionPlot_Options_Open_Data_File"/>
+     <property name="title">
+      <string>Plot + Line Options</string>
+     </property>
+     <addaction name="action_plot_options_load_data_file"/>
     </widget>
-    <addaction name="menuPlot_Options"/>
+    <addaction name="action_figure_options"/>
+    <addaction name="menu_plot_options"/>
    </widget>
-   <addaction name="menuFile"/>
-   <addaction name="menuEdit"/>
+   <widget class="QMenu" name="menu_help">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <property name="toolTipsVisible">
+     <bool>true</bool>
+    </property>
+    <addaction name="action_whatsthis"/>
+    <addaction name="action_website"/>
+    <addaction name="action_docs"/>
+   </widget>
+   <addaction name="menu_file"/>
+   <addaction name="menu_edit"/>
+   <addaction name="menu_help"/>
   </widget>
-  <action name="actionOpen_Data_File">
+  <action name="action_load_data_file">
    <property name="text">
-    <string>Add Data File...</string>
+    <string>Load Data File...</string>
+   </property>
+   <property name="statusTip">
+    <string>Add one or more data files to be plotted, each with their own options pane</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+O</string>
    </property>
   </action>
-  <action name="actionSave_Plot">
+  <action name="action_save_plot">
    <property name="text">
     <string>Save Plot...</string>
+   </property>
+   <property name="statusTip">
+    <string>Save the current plot as an image, PDF, or similar format</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+S</string>
    </property>
   </action>
-  <action name="actionGrid">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
+  <action name="action_plot_options_load_data_file">
    <property name="text">
-    <string>Grid</string>
-   </property>
-   <property name="menuRole">
-    <enum>QAction::ApplicationSpecificRole</enum>
+    <string>Load a Data File first...</string>
    </property>
   </action>
-  <action name="actionFile">
+  <action name="action_figure_options">
    <property name="text">
-    <string>File</string>
+    <string>Figure + Axes Options</string>
+   </property>
+   <property name="statusTip">
+    <string>Options relating to the whole figure or to an axes, such as the title or scale</string>
    </property>
   </action>
-  <action name="actionPlot_Options_Open_Data_File">
+  <action name="action_copy_plot">
    <property name="text">
-    <string>Choose a file first...</string>
+    <string>Copy Plot to Clipboard</string>
+   </property>
+   <property name="statusTip">
+    <string>Copy the current plot as an image to the clipboard</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+C</string>
    </property>
   </action>
-  <action name="actionAuto">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
+  <action name="action_whatsthis">
    <property name="text">
-    <string>Auto</string>
+    <string>WhatsThis</string>
+   </property>
+   <property name="toolTip">
+    <string>Get detailed info by clicking on a GUI element</string>
+   </property>
+   <property name="statusTip">
+    <string>Get detailed info by clicking on a GUI element</string>
    </property>
   </action>
-  <action name="actionTop_Right">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
+  <action name="action_website">
    <property name="text">
-    <string>Top Right</string>
+    <string>Plo.Py Website</string>
+   </property>
+   <property name="toolTip">
+    <string>https://finnventor.github.io/python/#plopy</string>
+   </property>
+   <property name="statusTip">
+    <string>https://finnventor.github.io/python/#plopy</string>
    </property>
   </action>
-  <action name="actionTop_Left">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
+  <action name="action_load_data_file_set_format">
    <property name="text">
-    <string>Top Left</string>
+    <string>Choose Input Date Format...</string>
+   </property>
+   <property name="statusTip">
+    <string>Change the date format for reading input files (default: Year Month Day)</string>
    </property>
   </action>
-  <action name="actionBottom_Right">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
+  <action name="action_docs">
    <property name="text">
-    <string>Bottom Right</string>
+    <string>Plo.Py Docs</string>
+   </property>
+   <property name="toolTip">
+    <string>https://plopy.readthedocs.io/</string>
+   </property>
+   <property name="statusTip">
+    <string>https://plopy.readthedocs.io/</string>
    </property>
   </action>
-  <action name="actionBottom_Left">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
+  <action name="action_load_data_file_advanced">
    <property name="text">
-    <string>Bottom Left</string>
+    <string>Load Data File with Fast Date Processing...</string>
    </property>
-  </action>
-  <action name="actionLeft">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Left</string>
-   </property>
-  </action>
-  <action name="actionRight">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Right</string>
-   </property>
-  </action>
-  <action name="actionTop">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Top</string>
-   </property>
-  </action>
-  <action name="actionBottom">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Bottom</string>
-   </property>
-  </action>
-  <action name="actionCenter">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Center</string>
+   <property name="statusTip">
+    <string>Advanced Add Data File dialog to process dates faster by manually specifying the format</string>
    </property>
   </action>
  </widget>

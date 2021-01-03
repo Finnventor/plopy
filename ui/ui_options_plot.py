@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'options_plotCrSAfP.ui'
+## Form generated from reading UI file 'options_plotJpnCDA.ui'
 ##
 ## Created by: Qt User Interface Compiler version 5.15.0
 ##
@@ -20,12 +20,18 @@ class Ui_PlotOptions(object):
     def setupUi(self, PlotOptions):
         if not PlotOptions.objectName():
             PlotOptions.setObjectName(u"PlotOptions")
-        PlotOptions.resize(460, 279)
-        PlotOptions.setSizeGripEnabled(False)
-        PlotOptions.setModal(False)
-        self.verticalLayout = QVBoxLayout(PlotOptions)
+        PlotOptions.resize(220, 127)
+        sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(PlotOptions.sizePolicy().hasHeightForWidth())
+        PlotOptions.setSizePolicy(sizePolicy)
+        PlotOptions.setFloating(True)
+        self.dockWidgetContents = QWidget()
+        self.dockWidgetContents.setObjectName(u"dockWidgetContents")
+        self.verticalLayout = QVBoxLayout(self.dockWidgetContents)
         self.verticalLayout.setObjectName(u"verticalLayout")
-        self.tab_widget = QTabWidget(PlotOptions)
+        self.tab_widget = QTabWidget(self.dockWidgetContents)
         self.tab_widget.setObjectName(u"tab_widget")
         self.tab_widget.setAutoFillBackground(False)
         self.tab_widget.setTabPosition(QTabWidget.North)
@@ -38,7 +44,7 @@ class Ui_PlotOptions(object):
 
         self.verticalLayout.addWidget(self.tab_widget)
 
-        self.button_box = QWidget(PlotOptions)
+        self.button_box = QWidget(self.dockWidgetContents)
         self.button_box.setObjectName(u"button_box")
         self.horizontalLayout = QHBoxLayout(self.button_box)
         self.horizontalLayout.setObjectName(u"horizontalLayout")
@@ -60,19 +66,14 @@ class Ui_PlotOptions(object):
 
         self.verticalLayout.addWidget(self.button_box)
 
-        self.dialog_button_box = QDialogButtonBox(PlotOptions)
-        self.dialog_button_box.setObjectName(u"dialog_button_box")
-        self.dialog_button_box.setOrientation(Qt.Horizontal)
-        self.dialog_button_box.setStandardButtons(QDialogButtonBox.Close)
-        self.dialog_button_box.setCenterButtons(False)
+        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
 
-        self.verticalLayout.addWidget(self.dialog_button_box)
+        self.verticalLayout.addItem(self.verticalSpacer)
 
-        QWidget.setTabOrder(self.tab_widget, self.line_button)
-        QWidget.setTabOrder(self.line_button, self.detail_button)
+        self.verticalLayout.setStretch(2, 1)
+        PlotOptions.setWidget(self.dockWidgetContents)
 
         self.retranslateUi(PlotOptions)
-        self.dialog_button_box.rejected.connect(PlotOptions.reject)
 
         self.tab_widget.setCurrentIndex(-1)
 
@@ -82,7 +83,7 @@ class Ui_PlotOptions(object):
 
     def retranslateUi(self, PlotOptions):
         self.line_button.setText(QCoreApplication.translate("PlotOptions", u"Add Line Plot", None))
-        self.detail_button.setText(QCoreApplication.translate("PlotOptions", u"Details", None))
+        self.detail_button.setText(QCoreApplication.translate("PlotOptions", u"View Data", None))
         pass
     # retranslateUi
 
