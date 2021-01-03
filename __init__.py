@@ -1,1096 +1,175 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function, division
-
 import sys
-from os.path import basename, isfile
+import os.path
+from datetime import datetime
 from dateutil import parser as dateparser
+from dateutil.parser._parser import ParserError as DateParserError
 from traceback import format_exc
+from io import BytesIO
 
-from matplotlib import use
-use("TkAgg")
-from matplotlib.figure import Figure
-from matplotlib.lines import Line2D
-from matplotlib import ticker, dates
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from PySide2.QtCore import *
+from PySide2.QtWidgets import *
+from PySide2.QtGui import QStandardItemModel, QStandardItem, QImage, QIcon, QDesktopServices
 
 import numpy as np
 
-try:  # Python 3
-    import tkinter as tk
-    from tkinter import ttk
-    from tkinter.messagebox import askquestion, showerror
-    from tkinter.filedialog import askopenfilenames, asksaveasfilename
-    from tkinter.colorchooser import askcolor
-    from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk as Navigation
-except ImportError:  # Python 2
-    import Tkinter as tk
-    import ttk
-    from tkMessageBox import askquestion, error
-    from tkFileDialog import askopenfilenames, asksaveasfilename
-    from tkColorChooser import askcolor
-    from matplotlib.backends.backend_tkagg import NavigationToolbar2TkAgg as Navigation
+from matplotlib import rcParams, ticker, dates as mpldates
+from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
+from matplotlib.colors import to_hex
+from matplotlib.backends.backend_qt5agg import FigureCanvas, NavigationToolbar2QT as NavigationToolbar
+
+from .ui.ui_mainwindow import Ui_MainWindow
+from .ui.ui_options_figure import Ui_FigureOptions
+from .ui.ui_options_axes import Ui_AxesOptions
+from .ui.ui_options_axes_add import Ui_AddAxesOptions
+from .ui.ui_options_axes_lim import Ui_AxesLimOptions
+from .ui.ui_options_plot import Ui_PlotOptions
+from .ui.ui_options_line import Ui_LineOptions
+from .ui.ui_dialog_load_advanced import Ui_AdvancedLoadDialog
+from .ui.ui_dialog_view_array import Ui_ViewArrayDialog
+from .ui.ui_dialog_view_file import Ui_ViewFileDialog
+from .ui.ui_options_parser import Ui_ParserOptionsDialog
 
 
-_pad = 5  # Default inter-widget padding
-_icon_base64 = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAD1BMVEU9S8398wXFw8Xt6+39//2jZEuFAAAAU0lEQVQI103O0Q2AIAwEUD66gIkTqAOA1wEo3P4zKaUY+/VyueSajrh0sSvBNkDqgG17AOY4CwqA+026qWpzVK1RFvGEzLMM5Fkmhe2Hb2JhvfEAWLIaQGXGTJoAAAAASUVORK5CYII="
-
-_root = None
+rcParams['savefig.directory'] = ""
 
 
-def array_from_file(filename, dateparserinfo=None):
-    """Get a 2D numpy array of float (or date, with dateutil.parser) from a file."""
+__all__ = 'array_from_file', 'add_file', 'add_array', 'start', 'fig', 'ax'
+
+
+dateparser_kw = {}
+
+def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
+    """
+    Get a 2D numpy array of float (or date represented as float in
+    the matplotlib standard) from a file.
+
+    Parameters
+    ----------
+    filename : str
+    date_format : str or None
+        If None, `dateutil.parser.parse` is used, which automatically
+        guesses the format (but uses `dateparserkw` to figure out
+        ambiguous dates).
+        Otherwise, the str is used in `datetime.datetime.strptime`
+        for faster loading.
+    dateparser_kw : dict
+        Keyword options for `dateutil.parser.parse`.
+
+    If the filename ends with ".csv" and the first line contains a ","
+    lines will be split on commas only, otherwise on any combination
+    of commas or whitespace.
+
+    If a value cannot be directly converted to a float, it will be
+    parsed as a date using `dateutil.parser.parse`, and if that fails
+    the whole line is assumed to be a header and discarded.
+
+    If `date_format` is specified, `datetime.datetime.strptime` is used
+    instead to parse dates.
+    """
     data = []
-    try:
-        with open(filename) as file:
+    with open(filename) as file:
+        if date_format:
+            if filename.endswith(".csv"):
+                line = file.readline()
+                file.seek(0)
+                if "," in line:
+                    for line in file:
+                        row = []
+                        for val in line.split(","):
+                            try:
+                                row.append(float(val))
+                            except ValueError:
+                                try:
+                                    row.append(mpldates.date2num(datetime.strptime(val, date_format)))
+                                except DateParserError:
+                                    break
+                        if len(row) > 1:
+                            data.append(row)
+                    return np.array(data)
+
             for line in file:
-                line = line.replace(",", " ")
                 row = []
-                for val in line.split():
+                for val in line.replace(",", " ").split():
                     try:
                         row.append(float(val))
                     except ValueError:
                         try:
-                            row.append(dates.date2num(dateparser.parse(val, dateparserinfo)))
-                        except Exception:
+                            row.append(mpldates.date2num(datetime.strptime(val, date_format)))
+                        except DateParserError:
                             break
                 if len(row) > 1:
                     data.append(row)
-        return np.array(data)
-    except Exception:
-        return np.array([])
 
+        elif filename.endswith(".csv"):
+            line = file.readline()
+            file.seek(0)
+            if "," in line:
+                for line in file:
+                    row = []
+                    for val in line.split(","):
+                        try:
+                            row.append(float(val))
+                        except ValueError:
+                            try:
+                                row.append(mpldates.date2num(dateparser.parse(val, **dateparser_kw)))
+                            except DateParserError:
+                                break
+                    if len(row) > 1:
+                        data.append(row)
+                return np.array(data)
 
-class _ToolTip(object):
-    """A tooltip that appears when the mouse enters the associated widget."""
-
-    def __init__(self, widget, text):
-        self.widget = widget
-        self.text = text
-        self.tipwindow = None
-        self.id = None
-        self.x = self.y = 0
-
-        widget.bind('<Enter>', self.showtip)
-        widget.bind('<Leave>', self.hidetip)
-
-    def showtip(self, *_):
-        """Show the tooltip (called on enter event)."""
-        if self.tipwindow or not self.text:
-            return
-        x, y, _, cy = self.widget.bbox("insert")
-        x = self.widget.winfo_rootx()
-        y = cy + self.widget.winfo_rooty() + 5
-        if cy == 0:
-            y += 18
-            x += 1
-
-        self.tipwindow = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(1)
-        tw.wm_geometry("+%d+%d" % (x, y))
-        try:  # For Mac OS
-            tw.tk.call("::tk::unsupported::MacWindowStyle",
-                       "style", tw._w,
-                       "help", "noActivates")
-        except tk.TclError:
-            pass
-        label = tk.Label(tw, text=self.text,
-                         background="#ffffff", relief="solid", borderwidth=1)
-        label.pack(ipadx=1)
-
-    def hidetip(self, *_):
-        """Hide the tooltip (called on leave event)."""
-        tw = self.tipwindow
-        self.tipwindow = None
-        if tw:
-            tw.destroy()
-
-
-class _CustomNotebook(ttk.Notebook):
-    """
-    A ttk Notebook with close buttons on each tab, customized for showing
-    FrameOptions. It automatically creates a hidden tab if no others exist
-    to ensure the notebook keeps its size.
-
-    Based on an example by @BrianOakley (boakley.github.io)
-    """
-
-    __initialized = False
-
-    def __init__(self, root, *args, **kwargs):
-        self.root = root
-        if not self.__initialized:
-            self.__initialize_custom_style()
-            self.__inititialized = True
-
-        kwargs["style"] = "CustomNotebook"
-        ttk.Notebook.__init__(self, *args, **kwargs)
-
-        self._active = None
-        self._emptyframe = None
-        self.isempty = True
-
-        self.bind("<ButtonPress-1>", self.on_close_press, True)
-        self.bind("<ButtonRelease-1>", self.on_close_release)
-
-        self._emptyframe = _LineOptions(self._root(), self, Line2D([], []),
-                                        notitle=True)
-        self.tab(0, state="disabled")
-
-    def add(self, widget, **kwargs):
-        """Add a widget to the notebook."""
-        ttk.Notebook.add(self, widget, **kwargs)
-        if self.isempty and len(self.tabs()) > 1:
-            self.hide(0)
-            self.isempty = False
-
-    def forget(self, index):
-        """Remove a widget from the notebook."""
-        if self.nametowidget(self.tabs()[index]) is not self._emptyframe:
-            self.nametowidget(self.tabs()[index]).destroy()
-            self._root().update()
-        if not self.select():
-            self.isempty = True
-            self.add(self._emptyframe)
-            self.tab(0, state="disabled")
-
-    def on_close_press(self, event):
-        """Called when the button is pressed over the close button."""
-        element = self.identify(event.x, event.y)
-
-        if "close" in element:
-            index = self.index("@%d,%d" % (event.x, event.y))
-            self.state(['pressed'])
-            self._active = index
-
-    def on_close_release(self, event):
-        """Called when the button is released over the close button."""
-        if not self.instate(['pressed']):
-            return
-
-        element = self.identify(event.x, event.y)
-        try:
-            index = self.index("@%d,%d" % (event.x, event.y))
-        except tk.TclError:
-            return
-
-        if "close" in element and self._active == index:
-            self.forget(index)
-            self.event_generate("<<NotebookTabClosed>>")
-
-        self.state(["!pressed"])
-        self._active = None
-
-    def __initialize_custom_style(self):
-        style = self.root.style
-        self.images = (
-            tk.PhotoImage("img_close", master=self.root, data='''
-                iVBORw0KGgoAAAANSUhEUgAAABIAAAASBAMAAACk4JNkAAAAGFBMVEUAAAAAAAA
-                AAAAAAAAAAAAAAAAAAAAAAABWNxwqAAAAB3RSTlMAj4FweoeWafOgkAAAAC1JRE
-                FUCNdjIAs4MLBAGMyFDOIGEKa4ailUlq1cAMpihLPElQoxdDgwMJFlOwCPLARt2
-                xEilQAAAABJRU5ErkJggg=='''),
-            tk.PhotoImage("img_closeactive", master=self.root, data='''
-                iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAQAAAD8x0bcAAAA1UlEQVR4AZXSM0I
-                GYBjA8d8et7BlHCDrCukUGUt2bbm27HOFK2TXZ//f6X0smZOvQ79+HfLFpdC1z7
-                B3o1AkKtx5sqsUlNr15E6FMIrcu1crnNpfWVFIcO5di2KTAkwq1uzdOUCeD0cY8
-                WkDbPg0jEMf8oAunxoElPPWfFoDDT51A2M+5QL2fQrEI9enMWDcp2zARoRRtk/j
-                QE9EukWLAmb1PvVGFj4aU/hRqHBOfWiKGMGMYo0+nEYO80G1cKpFDhPlcddSHrv
-                gm2QLjjyVAQORp5ImX1McV/+ToXN/AAAAAElFTkSuQmCC'''),
-            tk.PhotoImage("img_closepressed", master=self.root, data='''
-                iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAQAAAD8x0bcAAAAvUlEQVR4AZXSAeY
-                CURDH8Q+wsFdo/9BN/kDFUhLSLeoM6Qh1hFA6QR2hbpJIlG0jg+VF+g7M/N68N2
-                Pm+ZWWmYOzs4OZloTc1lPdsKetXIPMSS21kwzBKsTUVoK26i2sjcKrjOzCawPzu
-                FWi9HBXoh/qHDh6h3HY8x/J0RdwU4dVhmCsEporcEmSho2ky6dyXd1P5RYRdpqN
-                G4S6AP7i8Z1JOgKFYPl9mGSO39dCbpMseCOXUJjGV9mbKvzGC4+4qP/m7PJBAAA
-                AAElFTkSuQmCC'''),
-            tk.PhotoImage("img_blank", master=self.root, data='')
-        )
-
-        style.element_create("close", "image", "img_close",
-                             ("disabled", "img_blank"),
-                             ("active", "pressed", "!disabled", "img_closepressed"),
-                             ("active", "!disabled", "img_closeactive"), border=8, sticky='')
-        style.layout("CustomNotebook", [("CustomNotebook.client", {"sticky": "nswe"})])
-        style.layout("CustomNotebook.Tab", [
-            ("CustomNotebook.tab", {
-                "sticky": "nswe",
-                "children": [
-                    ("CustomNotebook.padding", {
-                        "side": "top",
-                        "sticky": "nswe",
-                        "children": [
-                            ("CustomNotebook.focus", {
-                                "side": "top",
-                                "sticky": "nswe",
-                                "children": [
-                                    ("CustomNotebook.label", {"side": "left", "sticky": ''}),
-                                    ("CustomNotebook.close", {"side": "left", "sticky": ''}),
-                                    ]
-                            })
-                        ]
-                    })
-                ]
-            })
-        ])
-
-
-class _MplCanvas(ttk.Frame):
-    """
-    A matplotlib canvas for tkinter.
-
-    Can be updated, but remember to call .draw()
-    """
-
-    def __init__(self, master):
-        ttk.Frame.__init__(self, master)
-
-        self.canvas = FigureCanvasTkAgg(fig, master=self)
-
-        self.canvas.get_tk_widget().pack(padx=5, fill="both", expand=1)
-
-        self.draw = self.canvas.draw
-        self.draw()
-
-        Navigation(self.canvas, self)
-
-
-class _ArrayView(tk.Toplevel):
-    """Display the first 25 and last 5 rows of an array in a Toplevel."""
-    def __init__(self, root, data, *args, **kwargs):
-        tk.Toplevel.__init__(self, root, *args, **kwargs)
-        self.resizable(False, False)
-        self.root = root
-        self.title("Plo.Py")
-        self.tk.call('wm', 'iconphoto', root._w,
-                     tk.PhotoImage(master=self, data=_icon_base64))
-
-        self.string = tk.StringVar()
-        if len(data) > 40:
-            self.string.set(str(data[:24])[:-1]
-                            + "\n ...\n"
-                            " "+str(data[-5:])[1:])
         else:
-            self.string.set(str(data))
-
-        ttk.Label(self, textvariable=self.string
-                  ).pack(padx=10, pady=(10, 0))
-
-        self.f = ttk.Frame(self)
-        self.f.pack()
-
-        ttk.Button(self.f, text="Close", command=self.destroy
-                   ).grid(row=0, column=1, padx=_pad, pady=_pad)
-
-
-class _FileView(_ArrayView):
-    """
-    Display the first 20 and last 5 rows of a file,
-    or their parsed version, in a Toplevel.
-    """
-
-    def __init__(self, root, data, filename, *args, **kwargs):
-        _ArrayView.__init__(self, root, data, *args, **kwargs)
-
-        self.toggle = ttk.Button(self.f, text="View Parsed",
-                                 command=self.viewparsed)
-        self.toggle.grid(row=0, column=0, padx=(_pad, 0), pady=_pad)
-
-        self.data = self.string.get()
-
-        with open(filename) as file:
-            lines = file.readlines()
-
-        if len(lines) > 40:
-            self.original = ("".join(lines[:21])
-                             + "...\n"
-                             + "".join(lines[-5:]).rstrip())
-        else:
-            self.original = "".join(lines).rstrip()
-
-        self.vieworiginal()
-
-    def viewparsed(self):
-        """Switch to showing the parsed version of the file (an array)."""
-        self.string.set(self.data)
-        self.toggle.config(text="View Original", command=self.vieworiginal)
-
-    def vieworiginal(self):
-        """Switch to showing the original raw version of the file."""
-        self.toggle.config(text="View Parsed", command=self.viewparsed)
-        self.string.set(self.original)
-
-
-class DateParserOptions(tk.Toplevel):
-    """
-    Window for configuring a datetime.parser
-    `callback` will be called with a `parserinfo` with the configuration.
-    """
-    parameters = {"Year Month Day": {"dayfirst":False, "yearfirst": True},
-                  "Day Month Year": {"dayfirst":True, "yearfirst": False},
-                  "Month Day Year": {"dayfirst":False, "yearfirst": False},
-                  "Year Day Month": {"dayfirst":True, "yearfirst": True}}
-
-    def __init__(self, root, callback, *args, **kwargs):
-        tk.Toplevel.__init__(self, root, *args, **kwargs)
-        self.title("Plo.Py")
-        self.tk.call('wm', 'iconphoto', self._w,
-                     tk.PhotoImage(master=self, data=_icon_base64))
-        self.resizable(False, False)
-        self.root = root
-        self.callback = callback
-
-        self.format = tk.StringVar(value=tuple(self.parameters.keys())[0])
-
-        w = 25
-
-        f = ttk.LabelFrame(self, text="Date Format")
-        o = ttk.OptionMenu(f, self.format, self.format.get(),
-                           *self.parameters.keys())
-        o.config(width=w)
-        o.grid(row=0, column=0, sticky="new", padx=5, pady=5)
-
-        f.columnconfigure(0, weight=1)
-        f.rowconfigure(0, weight=1)
-        f.grid(row=0, column=0, sticky="new", padx=7, pady=7)
-
-        # Ok, Cancel
-        f2 = ttk.Frame(self)
-        ttk.Button(f2, text="Ok", command=self.ok).grid(row=0, column=1, sticky="ne")
-        ttk.Button(f2, text="Cancel", command=self.destroy).grid(row=0, column=2, sticky="ne")
-        f2.grid(row=4, column=0, sticky="se", padx=4, pady=4)
-
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
-
-        for w in f2.winfo_children():
-            w.grid_configure(padx=3, pady=3)
-
-        self.focus_force()
-
-    def ok(self):
-        self.callback(dateparser.parserinfo(**self.parameters[self.format.get()]))
-        self.destroy()
-
-
-class LoadOptions(tk.Toplevel):
-    """Window with options for `np.loadtxt` and a file selection dialog.
-    Calls `callback(filecontent, filename)`."""
-    def __init__(self, root, callback, dateparseroptions=None, *args, **kwargs):
-        self.root = root
-        self.callback = callback
-        self.dateparseroptions = dateparseroptions
-        tk.Toplevel.__init__(self, root, *args, **kwargs, padx=5, pady=5)
-
-        self.tk.call('wm', 'iconphoto', self._w,
-                     tk.PhotoImage(master=self, data=_icon_base64))
-
-        f = ttk.Frame(self)
-        ttk.Label(f, text="Skiprows:").grid(row=1, column=0, sticky="nw")
-        self.skiprows = ttk.Spinbox(f, from_=0, to=float("inf"))
-        self.skiprows.grid(row=1, column=1, sticky="nwe")
-        self.skiprows.set(0)
-        _ToolTip(self.skiprows, "How many rows to ignore at the beginning of the file.")
-
-        ttk.Label(f, text="Max rows:").grid(row=2, column=0, sticky="nw")
-        self.maxrows = ttk.Spinbox(f, from_=0, to=float("inf"))
-        self.maxrows.grid(row=2, column=1, sticky="nwe")
-        _ToolTip(self.maxrows, "How many rows of the file to read (after skiprows).\nLeave blank to read all of them.")
-
-        ttk.Label(f, text="Delimiter:").grid(row=3, column=0, sticky="nw")
-        self.delim = ttk.Entry(f)
-        self.delim.grid(row=3, column=1, sticky="nwe")
-        _ToolTip(self.delim, "The characters in between data values.\nLeave blank for whitespace.")
-
-        ttk.Label(f, text="Date columns:").grid(row=4, column=0, sticky="nw")
-        self.datecols = ttk.Entry(f)
-        self.datecols.grid(row=4, column=1, sticky="nwe")
-        _ToolTip(self.datecols, "The column numbers (starting from 1) with date values, seperated by spaces and/or commas.")
-
-        ttk.Button(f, text="Select Date Format", command=lambda:
-            DateParserOptions(self, self.setparseroptions)).grid(row=5, column=0, columnspan=2, sticky="nw")
-
-        f.grid(row=0, column=0, sticky="nwe")
-        for w in f.winfo_children():
-            w.grid_configure(padx=3, pady=3)
-
-        f.columnconfigure(1, weight=1)
-
-        f = ttk.Frame(self)
-        ttk.Button(f, text="Select Files", command=self.select).grid(row=0, column=0, sticky="ne")
-        ttk.Button(f, text="Cancel", command=self.destroy).grid(row=0, column=1, sticky="ne")
-        f.grid(row=4, column=0, sticky="se")
-
-        for w in f.winfo_children():
-            w.grid_configure(padx=3, pady=3)
-
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
-
-        self.focus_force()
-
-    def select(self):
-        try:
-            skiprows = int(self.skiprows.get() or 0)
-        except ValueError:
-            self.skiprows.focus()
-            self.root.bell()
-            return
-
-        try:
-            maxrows = int(self.maxrows.get() or 0) or None
-        except ValueError:
-            self.maxrows.focus()
-            self.root.bell()
-            return
-
-        delim = self.delim.get() or None
-
-        datecols = self.datecols.get().replace(",", " ").strip()
-        converters = {}
-        if datecols:
-            try:
-                for col in datecols:
-                    converters[int(col)-1] = self.parse_date
-            except Exception as e:
-                raise
-
-        filenames = askopenfilenames(title="Plo.Py - Select Files",
-                                     filetypes=[('Data files', '.txt'),
-                                                ('Data files', '.dat'),
-                                                ('Data files', '.csv'),
-                                                ('All Files', '*')])
-
-        if filenames:
-            errors = False
-
-            for filename in filenames:
-                try:
-                    data = np.loadtxt(filename, skiprows=skiprows, max_rows=maxrows,
-                                      delimiter=delim, converters=converters)
-                    assert data.size > 0
-
-                except Exception as e:
-                    errors = True
-                    print("Could not load", filename)
-                    showerror(type(e).__name__, format_exc())
-                    continue
-
-                self.callback(data, filename)
-
-            if errors:
-                self.focus_force()
-            else:
-                self.destroy()
-
-    def setparseroptions(self, dateparseroptions):
-        self.dateparseroptions = dateparseroptions
-
-    def parse_date(self, string):
-        return dates.date2num(dateparser.parse(string, self.dateparseroptions))
-
-
-class AxesOptions(tk.Toplevel):
-    """
-    Window for configuring axes.
-    `callback` will be called after configuration is applied.
-    """
-    scales = {"Linear": "linear", "Logarithmic": "log"}
-    locators = {"None": ticker.NullLocator, "Auto": ticker.AutoLocator,
-                "Logarithmic": ticker.LogLocator, "Date": dates.AutoDateLocator}
-
-    formatters = {"None": ticker.NullFormatter, "Auto": ticker.ScalarFormatter,
-                  "Logarithmic": ticker.LogFormatter,
-                  "Date": dates.AutoDateFormatter}
-
-    mlocators = {"None": ticker.NullLocator, "Auto": ticker.AutoMinorLocator}
-    def __init__(self, root, ax, callback=None, *args, **kwargs):
-        tk.Toplevel.__init__(self, root, *args, **kwargs)
-        self.title("Plo.Py - Configure Axes")
-        self.tk.call('wm', 'iconphoto', self._w,
-                     tk.PhotoImage(master=self, data=_icon_base64))
-        self.resizable(False, False)
-        self.root = root
-        self.ax = ax
-        self.callback = callback
-
-        # Define tkinter variables and set default as current state
-        self.xscale = tk.StringVar(value=next((k for k, v in self.scales.items() if v == ax.xaxis.get_scale()), ""))
-        self.yscale = tk.StringVar(value=next((k for k, v in self.scales.items() if v == ax.yaxis.get_scale()), ""))
-        self.xlocator = tk.StringVar(value=next((k for k, v in self.locators.items() if v == type(ax.xaxis.get_major_locator())), ""))
-        self.ylocator = tk.StringVar(value=next((k for k, v in self.locators.items() if v == type(ax.yaxis.get_major_locator())), ""))
-        self.xformatter = tk.StringVar(value=next((k for k, v in self.formatters.items() if v == type(ax.xaxis.get_major_formatter())), ""))
-        self.yformatter = tk.StringVar(value=next((k for k, v in self.formatters.items() if v == type(ax.yaxis.get_major_formatter())), ""))
-        self.xmlocator = tk.StringVar(value=next((k for k, v in self.mlocators.items() if v == type(ax.xaxis.get_minor_locator())), ""))
-        self.ymlocator = tk.StringVar(value=next((k for k, v in self.mlocators.items() if v == type(ax.yaxis.get_minor_locator())), ""))
-
-        w = 15  # OptionMenu width
-
-        # Scales
-        f = ttk.LabelFrame(self, text="Scale")
-        ttk.Label(f, text="X:").grid(row=0, column=0, sticky="nw", padx=(5, 1), pady=(2, 4))
-        o = ttk.OptionMenu(f, self.xscale, self.xscale.get(),
-                           *self.scales.keys())
-        o.config(width=w)
-        o.grid(row=0, column=1, sticky="new", padx=(0, 5), pady=(0, 5))
-        ttk.Label(f, text="Y:").grid(row=0, column=2, sticky="nw", padx=(5, 1), pady=(2, 4))
-        o = ttk.OptionMenu(f, self.yscale, self.yscale.get(),
-                           *self.scales.keys())
-        o.config(width=w)
-        o.grid(row=0, column=3, sticky="new", padx=(0, 5), pady=(0, 5))
-        f.columnconfigure(1, weight=1)
-        f.columnconfigure(3, weight=1)
-        f.rowconfigure(0, weight=1)
-        f.grid(row=0, column=0, sticky="new", padx=7, pady=7)
-
-        # Locators
-        f = ttk.LabelFrame(self, text="Tick Locations")
-        ttk.Label(f, text="X:").grid(row=0, column=0, sticky="nw", padx=(5, 1), pady=(2, 4))
-        o = ttk.OptionMenu(f, self.xlocator, self.xlocator.get(),
-                           *self.locators.keys())
-        o.config(width=w)
-        o.grid(row=0, column=1, sticky="new", padx=(0, 5), pady=(0, 5))
-        ttk.Label(f, text="Y:").grid(row=0, column=2, sticky="nw", padx=(5, 1), pady=(2, 4))
-        o = ttk.OptionMenu(f, self.ylocator, self.ylocator.get(),
-                           *self.locators.keys())
-        o.config(width=w)
-        o.grid(row=0, column=3, sticky="new", padx=(0, 5), pady=(0, 5))
-        f.columnconfigure(1, weight=1)
-        f.columnconfigure(3, weight=1)
-        f.rowconfigure(0, weight=1)
-        f.grid(row=1, column=0, sticky="new", padx=7, pady=7)
-
-        # Formatters
-        f = ttk.LabelFrame(self, text="Tick Formats")
-        ttk.Label(f, text="X:").grid(row=0, column=0, sticky="nw", padx=(5, 1), pady=(2, 4))
-        o = ttk.OptionMenu(f, self.xformatter, self.xformatter.get(),
-                           *self.formatters.keys())
-        o.config(width=w)
-        o.grid(row=0, column=1, sticky="new", padx=(0, 5), pady=(0, 5))
-        ttk.Label(f, text="Y:").grid(row=0, column=2, sticky="nw", padx=(5, 1), pady=(2, 4))
-        o = ttk.OptionMenu(f, self.yformatter, self.yformatter.get(),
-                           *self.formatters.keys())
-        o.config(width=w)
-        o.grid(row=0, column=3, sticky="new", padx=(0, 5), pady=(0, 5))
-        f.columnconfigure(1, weight=1)
-        f.columnconfigure(3, weight=1)
-        f.rowconfigure(0, weight=1)
-        f.grid(row=2, column=0, sticky="new", padx=7, pady=7)
-
-        # MinorLocators
-        f = ttk.LabelFrame(self, text="Minor Tick Locations")
-        ttk.Label(f, text="X:").grid(row=0, column=0, sticky="nw", padx=(5, 1), pady=(2, 4))
-        o = ttk.OptionMenu(f, self.xmlocator, self.xmlocator.get(),
-                           *self.mlocators.keys())
-        o.config(width=w)
-        o.grid(row=0, column=1, sticky="new", padx=(0, 5), pady=(0, 5))
-        ttk.Label(f, text="Y:").grid(row=0, column=2, sticky="nw", padx=(5, 1), pady=(2, 4))
-        o = ttk.OptionMenu(f, self.ymlocator, self.ymlocator.get(),
-                           *self.mlocators.keys())
-        o.config(width=w)
-        o.grid(row=0, column=3, sticky="new", padx=(0, 5), pady=(0, 5))
-        f.columnconfigure(1, weight=1)
-        f.columnconfigure(3, weight=1)
-        f.rowconfigure(0, weight=1)
-        f.grid(row=3, column=0, sticky="new", padx=7, pady=7)
-
-        # Apply, Ok, Cancel
-        f2 = ttk.Frame(self)
-        ttk.Button(f2, text="Apply", command=self.apply).grid(row=0, column=0, sticky="ne")
-        ttk.Button(f2, text="Ok", command=self.ok).grid(row=0, column=1, sticky="ne")
-        ttk.Button(f2, text="Cancel", command=self.destroy).grid(row=0, column=2, sticky="ne")
-        f2.grid(row=4, column=0, sticky="se", padx=4, pady=4)
-
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
-
-        for w in f2.winfo_children():
-            w.grid_configure(padx=3, pady=3)
-
-        self.focus_force()
-
-    def apply(self):
-        """Apply the edits, returning True if successful."""
-        try:
-            if self.xscale.get():
-                self.ax.set_xscale(self.scales[self.xscale.get()])
-            if self.yscale.get():
-                self.ax.set_yscale(self.scales[self.yscale.get()])
-
-            if self.xlocator.get():
-                xl = self.locators[self.xlocator.get()]()
-                self.ax.xaxis.set_major_locator(xl)
-            if self.ylocator.get():
-                yl = self.locators[self.ylocator.get()]()
-                self.ax.yaxis.set_major_locator(yl)
-
-            if issubclass(self.locators[self.xlocator.get()], dates.DateLocator):
-                self.ax.xaxis.set_major_formatter(self.formatters[self.xformatter.get()](xl))
-            elif self.xformatter.get():
-                self.ax.xaxis.set_major_formatter(self.formatters[self.xformatter.get()]())
-            if issubclass(self.locators[self.ylocator.get()], dates.DateLocator):
-                self.ax.yaxis.set_major_formatter(self.formatters[self.yformatter.get()](yl))
-            elif self.yformatter.get():
-                self.ax.yaxis.set_major_formatter(self.formatters[self.yformatter.get()]())
-
-            if self.xmlocator.get():
-                self.ax.xaxis.set_minor_locator(self.mlocators[self.xmlocator.get()]())
-            if self.ymlocator.get():
-                self.ax.yaxis.set_minor_locator(self.mlocators[self.ymlocator.get()]())
-
-            if self.callback:
-                self.callback()
-        except Exception:
-            self.root.bell()
-            raise
-        return True
-
-    def ok(self):
-        if self.apply():
-            self.destroy()
-
-
-class _LineOptions(ttk.Frame):
-    """A frame with options for a plotted line."""
-
-    linetypes = {"-": "Line                         -",
-                 "--": "Dashed line           --",
-                 "-.": "Dot-Dash line        -.",
-                 ":": "Dotted line              :",
-                 "None": "No Line                    "}
-
-    markertypes = {"o": "Circle marker          o",
-                   "^": "Triangle marker      ^",
-                   "s": "Square marker         s",
-                   "p": "Pentagon marker    p",
-                   "h": "Hexagon marker     h",
-                   "*": "Star marker              *",
-                   "+": "Plus marker             +",
-                   ".": "Point marker             .",
-                   ",": "Pixel marker              ,",
-                   "None": "No marker                  "}
-
-    def __init__(self, root, notebook, line, notitle=False, *args, **kwargs):
-        ttk.Frame.__init__(self, notebook, *args, **kwargs, style="W.TFrame")
-        self.root = root
-        self.line = line
-
-        self.label = tk.StringVar(value=self.line.get_label())
-        ttk.Entry(self, width=47, textvariable=self.label
-                  ).grid(row=0, column=0, columnspan=2, sticky="EW", padx=_pad)
-
-        b = ttk.Button(self, text="View", command=self.show)
-        b.grid(row=0, column=2, padx=(1, _pad), pady=_pad)
-
-        self.lineformat = tk.StringVar(
-            value=self.linetypes.get(self.line.get_ls(), "None"))
-        ttk.OptionMenu(self, self.lineformat, self.lineformat.get(),
-                       *self.linetypes.values(),
-                       style="W.TMenubutton"
-                       ).grid(row=2, column=0, sticky="w")
-
-        self.markerformat = tk.StringVar(
-            value=self.markertypes.get(self.line.get_marker(), "None"))
-        ttk.OptionMenu(self, self.markerformat, self.markerformat.get(),
-                       *self.markertypes.values(),
-                       style="W.TMenubutton"
-                       ).grid(row=2, column=1, sticky="w")
-
-        self.root.style.configure(self.line.get_c()+".TButton",
-                                  background=self.line.get_c())
-        self.colorbutton = ttk.Button(self, style=self.line.get_c()+".TButton",
-                                      text="Color", command=self.selectcolor)
-        self.colorbutton.grid(row=2, column=2, padx=(1, _pad), pady=_pad)
-
-        self.label.trace("w", self.updatelabel)
-        self.markerformat.trace("w", self.updatemarker)
-        self.lineformat.trace("w", self.updateline)
-
-        notebook.add(self, text="" if notitle else self.line.get_label() or "Untitled",
-                     sticky="nesw")
-
-    def show(self):
-        """Open an _ArrayView window showing the data."""
-        _ArrayView(self.root, np.column_stack(self.line.get_data()))
-
-    def selectcolor(self):
-        """Open a colorchooser dialog (for the color of the line)."""
-        color = askcolor(self.line.get_c(), title="Select Color - Plo.Py")[1]
-        if color is not None:
-            self.root.style.configure(color+".TButton",
-                                      background=color)
-            self.colorbutton.config(style=color+".TButton")
-            # add color to root
-            self.line.set_c(color)
-            self.update()
-
-    def update(self, *_):
-        """Update the graph."""
-        self.root.draw()
-
-    def updatelabel(self, *_):
-        """Called when the label entry is edited."""
-        self.line.set_label(self.label.get())
-        self.update()
-
-    def updatemarker(self, *_):
-        """Called when the selected marker is changed."""
-        self.line.set_marker(self.markerformat.get()[-2].strip() +
-                             self.markerformat.get()[-1])
-        self.update()
-
-    def updateline(self, *_):
-        """Called when the selected linestyle is changed."""
-        self.line.set_ls(self.lineformat.get()[-2].strip() +
-                         self.lineformat.get()[-1])
-        self.update()
-
-    def destroy(self):
-        ttk.Frame.destroy(self)
-        if self.line in ax.lines:
-            ax.lines.remove(self.line)
-        self.update()
-
-
-class _LineColumnOptions(_LineOptions):
-    """A frame with options for a plotted line with column selection."""
-    def __init__(self, root, notebook, line, data):
-        self.data = data
-        _LineOptions.__init__(self, root, notebook, line)
-
-        colf = ttk.LabelFrame(self, style="W.TFrame", relief="groove",
-                              labelwidget=ttk.Label(self, text="Columns",
-                                                    style="W.TLabel"))
-        colf.grid(row=1, columnspan=3, sticky="EW", padx=_pad, ipady=(3))
-
-        columns = [str(i) for i in range(1, 1 + self.data.shape[1])]
-
-        ttk.Label(colf, style="W.TLabel", text="Size: {}".format(self.data.shape)
-                  ).grid(row=0, column=0, padx=_pad)
-
-        ttk.Label(colf, text="X: Column", style="W.TLabel"
-                  ).grid(row=0, column=2, padx=(_pad, 0))
-        self.xcolumn = tk.StringVar()
-        ttk.OptionMenu(colf, self.xcolumn, "1", *columns,
-                       style="W.TMenubutton"
-                       ).grid(row=0, column=3)
-
-        ttk.Label(colf, text="Y: Column", style="W.TLabel"
-                  ).grid(row=0, column=4, padx=(2*_pad, 0))
-        self.ycolumn = tk.StringVar()
-        ttk.OptionMenu(colf, self.ycolumn, "2", *columns,
-                       style="W.TMenubutton").grid(row=0, column=5)
-
-        self.xcolumn.trace("w", self.updatexcolumn)
-        self.ycolumn.trace("w", self.updateycolumn)
-
-        colf.grid_columnconfigure(1, weight=1)
-        colf.grid_columnconfigure(6, weight=2)
-
-    def updatexcolumn(self, *_):
-        self.line.set_xdata(self.data[:, int(self.xcolumn.get())-1])
-        self.root.update()
-
-    def updateycolumn(self, *_):
-        self.line.set_ydata(self.data[:, int(self.ycolumn.get())-1])
-        self.root.update()
-
-    def show(self):
-        """Open an _ArrayView window showing the data."""
-        _ArrayView(self.root, self.data)
-
-
-class _LineFileOptions(_LineColumnOptions):
-    """
-    A frame with options for a plotted line with column selection
-    and file viewing.
-    """
-
-    def __init__(self, root, notebook, line, data, filename, *args, **kwargs):
-        _LineColumnOptions.__init__(self, root, notebook, line, data,
-                                    *args, **kwargs)
-        self.filename = filename
-
-    def show(self):
-        """Open an _FileView window showing the parsed and unparsed data."""
-        _FileView(self.root, self.data, self.filename)
-
-
-class _Window(tk.Tk):
-    """The main plopy window. Use start() to open."""
-
+            for line in file:
+                row = []
+                for val in line.replace(",", " ").split():
+                    try:
+                        row.append(float(val))
+                    except ValueError:
+                        try:
+                            row.append(mpldates.date2num(dateparser.parse(val, **dateparser_kw)))
+                        except DateParserError:
+                            break
+                if len(row) > 1:
+                    data.append(row)
+    return np.array(data)
+
+
+class ParserOptionsDialog(QDialog):
+    date_formats_kw = [{"dayfirst":False, "yearfirst": True},   # YMD
+                       {"dayfirst":True, "yearfirst": False},   # DMY
+                       {"dayfirst":False, "yearfirst": False},  # MDY
+                       {"dayfirst":True, "yearfirst": True}]    # YDM
     def __init__(self, *args, **kwargs):
-        self.isedited = False
-        tk.Tk.__init__(self, *args, **kwargs)
-        self.title("Plo.Py")
+        super().__init__(*args, **kwargs)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)  # hide ? button
 
-        self.tk.call('wm', 'iconphoto', self._w,
-                     tk.PhotoImage(master=self, data=_icon_base64))
+        self.ui = Ui_ParserOptionsDialog()
+        self.ui.setupUi(self)
 
-        self.style = ttk.Style()
-        self.style.configure("W.TLabel", background='#ffffff')
-        self.style.configure("W.TFrame", background='#ffffff')
-        self.style.configure("W.TCheckbutton", background='#ffffff')
-        self.style.configure("W.TMenubutton", background='#ffffff')
+        try:
+            self.ui.date_format.setCurrentIndex(self.date_formats_kw.index(dateparser_kw))
+        except ValueError:
+            pass
 
-        menu = tk.Menu(self)
-        # File
-        m = tk.Menu(menu, tearoff=0)
-        self.parseroptions = dateparser.parserinfo(yearfirst=True)  # Y, M, D
-        m.add_command(label="Load Data", command=self.selectfile)
-        m.add_command(label="Load Data (Advanced)", command=lambda: LoadOptions(self, self.addfile, self.parseroptions))
-        m.add_command(label="Reload Data", command=self.reloadfiles)
-        m.add_command(label="Save Image", command=self.savefile)
-        m.add_separator()
-        m.add_command(label="Configure Parsing", command=lambda:
-            DateParserOptions(self, self.setparseroptions))
-        menu.add_cascade(label="File", menu=m)
+        self.accepted.connect(self.apply_config)
 
-        # Format
-        self.showgrid = tk.BooleanVar()
-        self.aspectratio = tk.StringVar(value=ax.get_aspect())
-        self.legend_loc = tk.StringVar(value="best")
-        self.dorescale = tk.BooleanVar()
-        self.dodraw = tk.BooleanVar(value=True)
-
-        m = tk.Menu(menu, tearoff=0)
-        m_loc = tk.Menu(m)
-
-        m.add_command(label="Configure Axes", command=lambda:
-            AxesOptions(self, ax, callback=self.draw))
-        m.add_checkbutton(label="Grid",
-                          command=self.setgrid, variable=self.showgrid)
-        m.add_checkbutton(label="Equal Aspect Ratio",
-                          onvalue="equal", offvalue="auto",
-                          command=self.setaspect, variable=self.aspectratio)
-
-        m_loc.add_radiobutton(label="Auto", value="best", variable=self.legend_loc, command=self.draw)
-        m_loc.add_separator()
-        m_loc.add_radiobutton(label="Top Right", value="upper right", variable=self.legend_loc, command=self.draw)
-        m_loc.add_radiobutton(label="Top Left", value="upper left", variable=self.legend_loc, command=self.draw)
-        m_loc.add_radiobutton(label="Bottom Left", value="lower left", variable=self.legend_loc, command=self.draw)
-        m_loc.add_radiobutton(label="Bottom Right", value="lower right", variable=self.legend_loc, command=self.draw)
-        m_loc.add_separator()
-        m_loc.add_radiobutton(label="Left", value="center left", variable=self.legend_loc, command=self.draw)
-        m_loc.add_radiobutton(label="Right", value="center right", variable=self.legend_loc, command=self.draw)
-        m_loc.add_radiobutton(label="Top", value="upper center", variable=self.legend_loc, command=self.draw)
-        m_loc.add_radiobutton(label="Bottom", value="lower center", variable=self.legend_loc, command=self.draw)
-        m_loc.add_separator()
-        m_loc.add_radiobutton(label="Center", value="center", variable=self.legend_loc, command=self.draw)
-
-        m.add_cascade(label="Legend Location", menu=m_loc)
-
-        m.add_separator()
-        m.add_checkbutton(label="Auto-Rescale Axes",
-                          command=self.draw, variable=self.dorescale)
-        menu.add_cascade(label="Format", menu=m)
-
-        self.config(menu=menu)
-
-        self.canvas = _MplCanvas(self)
-        self.canvas.grid(row=1, column=0, sticky="nsew", padx=5, rowspan=2)
-
-        self.grid_columnconfigure(0, weight=1, minsize=300)
-        self.grid_rowconfigure(2, weight=1, minsize=300)
-
-        self.titlevar = tk.StringVar()
-        if fig._suptitle:
-            self.titlevar.set(fig._suptitle.get_text())
-        e = ttk.Entry(self, textvariable=self.titlevar, width=40,
-                      justify="center")
-        e.grid(row=0, column=0, padx=50, pady=(5, 0))
-        _ToolTip(e, "Plot Title")
-        self.titlevar.trace("w", self.settitle)
-
-        flabel = ttk.Frame(self)
-        flabel.grid(row=3, column=0, sticky="ew")
-        flabel.grid_columnconfigure(1, weight=1)
-
-        self.ylabel = tk.StringVar(value=ax.get_ylabel())
-        e = ttk.Entry(flabel, textvariable=self.ylabel, width=20)
-        e.grid(row=0, column=0, padx=(5, 0))
-        _ToolTip(e, "Y Axis Label")
-        self.ylabel.trace("w", self.setylabel)
-        self.xlabel = tk.StringVar(value=ax.get_xlabel())
-        e = ttk.Entry(flabel, textvariable=self.xlabel, width=20)
-        e.grid(row=0, column=1, pady=_pad)
-        _ToolTip(e, "X Axis Label")
-        self.xlabel.trace("w", self.setxlabel)
-
-        ttk.Frame(flabel, height=15, width=120
-                  ).grid(row=0, column=2, fill=None)
-
-        ttk.Button(self, text="Add File", command=self.selectfile
-                   ).grid(row=0, column=1)
-
-        b = ttk.Button(self, text="Save", command=self.savefile)
-        b.grid(row=3, column=1)
-        _ToolTip(b, "Save Plot as Image")
-
-        self.notebook = _CustomNotebook(self)
-        self.notebook.grid(row=1, column=1, sticky="n")
-
-        self.bind("<Control-s>", self.savefile)
-        self.bind("<Control-r>", self.reloadfiles)
-        self.bind("<Control-o>", self.selectfile)
-
-        self.after_idle(self.load)
-
-        self.dorescale.set(True)
-
-    def load(self):
-        """Load pre-selected files and data."""
-        self.focus_force()
-        for line in ax.lines:
-            _LineOptions(self, self.notebook, line)
-
-        self.addfiles(_files_to_load)
-        for n, a in _data_to_load.items():
-            self.adddata(a, n)
-
-    def adddata(self, array, name):
-        """Add an array to be plotted."""
-        _LineColumnOptions(self, self.notebook,
-                           ax.plot(array[:, 0], array[:, 1], label=name)[0],
-                           array)
-        self.update()
-
-    def addfile(self, array, filename):
-        """Add a file's contents to be plotted."""
-        _LineFileOptions(self, self.notebook,
-                         ax.plot(array[:, 0], array[:, 1],
-                                 label=basename(filename))[0],
-                         array, filename)
-        self.update()
-
-    def selectfile(self, *_):
-        """Open a file selection dialog, then send the output to .addfiles()"""
-        filenames = askopenfilenames(title="Plo.Py - Add Files",
-                                     filetypes=[('Data files', '.txt'),
-                                                ('Data files', '.dat'),
-                                                ('Data files', '.csv'),
-                                                ('All Files', '*')])
-        self.addfiles(filenames)
-
-    def addfiles(self, filenames):
-        """Add one or more filenames to be parsed and plotted."""
-        for filename in filenames:
-            filecontent = array_from_file(filename, self.parseroptions)
-            if len(filecontent.shape) != 2:
-                print("Could not parse", basename(filename))
-                self.bell()
-                continue
-
-            self.addfile(filecontent, filename)
-
-        if filenames:
-            if not self.titlevar.get():
-                self.titlevar.set(basename(filenames[0]))
-
-    def update(self):
-        """Update the _MplCanvas."""
-        if self.dodraw.get():
-            if self.dorescale.get():
-                ax.relim()
-                ax.autoscale()
-
-            self.draw()
-
-    def draw(self):
-        """Redraw the _MplCanvas."""
-        if self.dodraw.get():
-            handles, labels = ax.get_legend_handles_labels()
-            if labels:
-                ax.legend(handles, labels, loc=self.legend_loc.get())
-
-            self.canvas.draw()
-            self.isedited = True
-
-    def settitle(self, *_):
-        """Update the graph's title."""
-        fig.suptitle(self.titlevar.get())
-        self.draw()
-
-    def setxlabel(self, *_):
-        """Update the graph's x-axis label."""
-        ax.set_xlabel(self.xlabel.get())
-        self.draw()
-
-    def setylabel(self, *_):
-        """Update the graph's y-axis label."""
-        ax.set_ylabel(self.ylabel.get())
-        self.draw()
-
-    def setaspect(self):
-        """Update the graph's aspect ratio."""
-        ax.set_aspect(self.aspectratio.get())
-        self.draw()
-
-    def setgrid(self):
-        """Update the graph's grid."""
-        ax.grid(self.showgrid.get())
-        self.draw()
-
-    def setparseroptions(self, parseroptions):
-        self.parseroptions = parseroptions
-
-    def reloadfiles(self, *_):
-        """Re-parse all loaded files, then update the graph."""
-        for pane in self.notebook.winfo_children():
-            if isinstance(pane, _LineFileOptions):
-                pane.data = array_from_file(pane.filename, self.parseroptions)
-                pane.updatexcolumn()
-                pane.updateycolumn()
-
-    def savefile(self, *_):
-        """
-        Save the plot as an image or other format.
-
-        Returns whethere the plot was saved.
-        """
-        plttitle = fig._suptitle
-        filetypes = [(v, "."+k) for k, v in
-                     self.canvas.canvas.get_supported_filetypes().items()]
-        if plttitle and plttitle.get_text():
-            plttitle = plttitle.get_text()
-            if not plttitle.lower().endswith(".png"):
-                plttitle += ".png"
-        else:
-            plttitle = ""
-        filename = asksaveasfilename(title="Plo.Py - Save Plot",
-                                     initialfile=plttitle,
-                                     filetypes=[("All Files", "*")]+filetypes)
-        if filename:
-            fig.savefig(filename)
-            self.isedited = False
-            return True
-        return False
-
-    def destroy(self):
-        """Close the window. If plot was edited, show save/close dialog."""
-        if self.isedited and not self.notebook.isempty:
-            response = askquestion(title="Plo.Py",
-                                   message="Save plot before closing?",
-                                   type="yesnocancel")
-
-            if response == "yes":
-                if not self.savefile():
-                    return
-            elif response == "cancel":
-                return
-
-        self.dodraw.set(False)
-        tk.Tk.destroy(self)
+    def apply_config(self):
+        dateparser_kw.update(self.date_formats_kw[self.ui.date_format.currentIndex()])
 
 
 fig = Figure()
-ax = fig.add_subplot(111)
+ax = fig.add_subplot()
 
 
 _files_to_load = []
-_data_to_load = {}
+_data_to_load = []
 
 suppress_errors = False
 """bool: Whether to hide errors and other output from add_file and add_array"""
+
 
 def add_file(filename):
     """
@@ -1110,15 +189,15 @@ def add_file(filename):
     -----
         `filename` should have at least 2 rows and 2 columns.
     """
-    if isfile(filename):
+    if os.path.isfile(filename):
         _files_to_load.append(filename)
         return True
     if not suppress_errors:
-        print("[PloPy]: '{}' is not a file.".format(filename))
+        print(f"[PloPy]: '{filename}' is not a file.")
     return False
 
 
-def add_array(array, name):
+def add_array(array, name=None, raise_=False):
     """
     Add an array to be loaded.
 
@@ -1126,9 +205,8 @@ def add_array(array, name):
     ----------
     array : np.array or list-like of list-like of float
         The data to be loaded (should be 2d).
-    name : str
-        The name to be used for the tab. Must be unique,
-        or it will overwrite another array.
+    name : str or None
+        The name to be used for the tab.
 
     Returns
     -------
@@ -1142,17 +220,701 @@ def add_array(array, name):
     try:
         array = np.array(array)
     except Exception:
-        print("[PloPy]: Could not convert {} into numpy array".format(name))
+        print(f"[PloPy]: Could not convert {name} into numpy array")
+        if raise_:
+            raise
         return False
     if len(array.shape) == 2:
-        if name in _data_to_load and not suppress_errors:
-            print("[PloPy]: Array {} updated (it was already loaded)."
-                  .format(name))
-        _data_to_load[name] = array
+        _data_to_load.append((array, name))
         return True
     if not suppress_errors:
         print("[PloPy]: Array must be 2D (of columns and rows).")
     return False
+
+
+def update():
+    """
+    Redraw the canvas.
+    Weakest level of updating.
+    """
+    fig.canvas.draw()
+
+def relabel(axes, draw=True):
+    """
+    Update the legend and redraw the canvas.
+    Second-weakest level of updating.
+
+    Necessary after changing a line's label, markers, or linestyle.
+    """
+    handles, labels = axes.get_legend_handles_labels()
+    if labels:
+        axes.legend(handles, labels, loc=axes.plopy_legend_loc)
+    else:
+        l = axes.get_legend()
+        if l: l.remove()
+    if draw:
+        update()
+
+def relim(axes, draw=True):
+    """
+    Recalculate axes limits, update the legend, and redraw the canvas.
+    Strongest level of updating.
+    """
+    axes.relim()
+    axes.autoscale()
+    relabel(axes, draw)
+
+
+def axes_to_str(axes):
+    """Return the location of the axes as the string "Axes (`nrows`, `ncols`, `index`)" """
+    return f"Axes {str(axes.get_gridspec())[8:-1]}, {axes.get_subplotspec().num1+1})"
+
+
+class FigureCanvasCustom(FigureCanvas):
+    def get_window_title(self):
+        title = None
+        if self.figure._suptitle:
+            title = self.figure._suptitle.get_text()
+        if not title:
+            for axes in self.figure.axes:
+                title = axes.get_title()
+                if title:
+                    break
+        if not title:
+            return super().get_window_title()
+        return title
+
+
+class ViewArrayDialog(QDialog):
+    def __init__(self, data, name, *args, **kwargs):
+        super().__init__(*args, **kwargs, windowTitle=f"Plo.Py - View {name}")
+        self.ui = Ui_ViewArrayDialog()
+        self.ui.setupUi(self)
+        self.data = data
+
+        self.ui.data_load_all.pressed.connect(self.populate_table)
+        self.populate_table(max=20)
+
+    def populate_table(self, max=None):
+        xlen, ylen = self.data.shape
+        if max:
+            if xlen > max: xlen = max
+            if ylen > max: ylen = max
+
+        self.ui.data_table.setRowCount(xlen)
+        self.ui.data_table.setColumnCount(ylen)
+
+        for x in range(xlen):
+            for y in range(ylen):
+                self.ui.data_table.setItem(x, y, QTableWidgetItem(str(self.data[x, y])))
+
+
+class ViewFileDialog(ViewArrayDialog):
+    def __init__(self, data, filename, *args, **kwargs):
+        self.__has_loaded_raw = False
+        QDialog.__init__(self, *args, **kwargs, windowTitle=f"Plo.Py - View {os.path.basename(filename)}")
+        self.ui = Ui_ViewFileDialog()
+        self.ui.setupUi(self)
+        self.data = data
+        self.filename = filename
+
+        self.ui.data_load_all.pressed.connect(self.populate_table)
+        self.ui.raw_load_all.pressed.connect(self.populate_raw)
+
+        self.populate_table(max=20)
+        self.ui.tabWidget.currentChanged.connect(self.tab_change)
+
+    def tab_change(self, index):
+        if self.__has_loaded_raw is False and index == 1:
+            try:
+                self.populate_raw(max=20)
+            except Exception:
+                self.ui.raw_text.setPlainText(format_exc())
+
+    def populate_raw(self, max=None):
+        with open(self.filename) as f:
+            lines = []
+            for i, line in enumerate(f):
+                lines.append(line)
+                if max and i > max:
+                    break
+        self.ui.raw_text.setPlainText("".join(lines))
+        self.__has_loaded_raw = True
+
+
+class AdvancedLoadDialog(QDialog):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.ui = Ui_AdvancedLoadDialog()
+        self.ui.setupUi(self)
+
+    def setup_current_time(self):
+        table = self.ui.date_format_table
+        current_time = datetime.now()
+        for row in range(table.rowCount()):
+            table.setItem(row, 1, QTableWidgetItem(current_time.strftime(table.verticalHeaderItem(row).text())))
+
+    def choose_data_files(self):
+        filenames, extension = QFileDialog.getOpenFileNames(self,
+            "Plo.Py - Open Data File", None, "Text Files (*.txt *.csv *.dat);;All Files (*)")
+
+    def exec_(self):
+        self.setup_current_time()
+        return super().exec_()
+
+
+class LineOptions(QWidget):
+    linestyles = "-", "--", ":", "-.", ""
+    markerformats = "o", "^", "s", "p", "h", "*", "+", ".", ",", ""
+
+    def __init__(self, master, line, x, y, axes_list, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.master = master
+        self.line = line
+
+        self.ui = Ui_LineOptions()
+        self.ui.setupUi(self)
+
+        col_names = [f"Column {i}" for i in range(1, self.master.data.shape[1]+1)]
+        self.ui.x_column.addItems(col_names)
+        self.ui.x_column.setCurrentIndex(x)
+        self.ui.y_column.addItems(col_names)
+        self.ui.y_column.setCurrentIndex(y)
+
+        self.ui.x_column.currentIndexChanged.connect(self.update_xcol)
+        self.ui.y_column.currentIndexChanged.connect(self.update_ycol)
+        self.ui.legend_label.setText(line.get_label())
+        self.ui.legend_label.textChanged.connect(self.update_label)
+        self.ui.line_format.currentIndexChanged.connect(self.update_line_format)
+        self.ui.marker_format.currentIndexChanged.connect(self.update_marker_format)
+        self.ui.line_width.setValue(line.get_linewidth())
+        self.ui.line_width.valueChanged.connect(self.update_line_width)
+        self.ui.marker_size.setValue(line.get_markersize())
+        self.ui.marker_size.valueChanged.connect(self.update_marker_size)
+        self.update_color(dialog=False)
+        self.ui.set_color.pressed.connect(self.update_color)
+
+        self.ui.axes_select.setModel(axes_list)
+        self.ui.axes_select.currentTextChanged.connect(self.update_axes)
+
+        self.ui.line_width.setWhatsThis(f"The width of the line.\nDefault: {rcParams['lines.linewidth']}")
+        self.ui.marker_size.setWhatsThis(f"The area of each marker.\nDefault: {rcParams['lines.markersize']}")
+
+    def update_xcol(self, index):
+        self.line.set_xdata(self.master.data[:, index])
+        relim(self.line.axes)
+
+    def update_ycol(self, index):
+        self.line.set_ydata(self.master.data[:, index])
+        relim(self.line.axes)
+
+    def update_label(self, text):
+        self.line.set_label(text)
+        relabel(self.line.axes)
+
+    def update_line_format(self, index):
+        self.line.set_linestyle(self.linestyles[index])
+        relabel(self.line.axes)
+
+    def update_marker_format(self, index):
+        self.line.set_marker(self.markerformats[index])
+        relabel(self.line.axes)
+
+    def update_line_width(self, n):
+        self.line.set_linewidth(n)
+        relabel(self.line.axes)
+
+    def update_marker_size(self, n):
+        self.line.set_markersize(n)
+        relabel(self.line.axes)
+
+    def update_color(self, dialog=True):
+        color = to_hex(self.line.get_c())
+        if dialog:
+            new_qcolor = QColorDialog.getColor(color)
+            if not new_qcolor.isValid():
+                return
+            color = new_qcolor.name()  # to hex
+            self.line.set_c(color)
+            relabel(self.line.axes)
+        self.ui.color_frame.setStyleSheet(f"#color_frame {{background-color: {color}}}")
+
+    def update_axes(self, text):
+        new_axes = next((axes for axes in fig.axes if axes_to_str(axes) == text), None)
+        if not new_axes:
+            print(self.line, "could not be moved to a new axes.")
+            return
+        old_axes = self.line.axes
+        self.line.remove()
+        self.line.axes = new_axes
+        self.line.set_transform(new_axes.transData)
+        new_axes.add_line(self.line)
+        relim(old_axes, draw=False)
+        relim(new_axes)
+
+
+class ArrayPlotDialog(QDockWidget):
+    _title_count = 0
+    @classmethod
+    def generate_title(cls):
+        cls._title_count += 1
+        return f"Array {cls._title_count}"
+
+    def __init__(self, data, axes_list, windowTitle=None, *args, add_initial_line=True, **kwargs):
+        assert len(data.shape) == 2  #  input data must be a 2D array
+        self.data = data
+        self.axes_list = axes_list  # synced to update the line's axes chooser
+        if not windowTitle:
+            windowTitle = self.generate_title()
+        super().__init__(*args, **kwargs, windowTitle=windowTitle)
+        self.ui = Ui_PlotOptions()
+        self.ui.setupUi(self)
+
+        self.current_line_number = 1
+
+        self.ui.line_button.pressed.connect(self.add_new_line)
+        self.ui.tab_widget.tabCloseRequested.connect(self.remove_tab)
+        self.ui.detail_button.pressed.connect(self.detail_dialog)
+
+        self.topLevelChanged.connect(self.resize_when_floating)
+
+        if add_initial_line: self.add_new_line()
+
+    def remove_tab(self, index):
+        widget = self.ui.tab_widget.widget(index)
+        if widget is not None:
+            axes = widget.line.axes
+            axes.lines.remove(widget.line)
+            relim(axes)
+            widget.deleteLater()
+        self.ui.tab_widget.removeTab(index)
+
+    def add_new_line(self):
+        y_col = self.current_line_number if self.current_line_number < self.data.shape[1] else 1
+        line, = fig.axes[0].plot(self.data[:, 0], self.data[:, y_col],
+                                 label=f"{self.windowTitle()} Line {self.current_line_number}")
+        self.add_line(line)
+
+        relabel(line.axes)
+
+    def add_line(self, line):
+        y_col = self.current_line_number if self.current_line_number < self.data.shape[1] else 1
+        w = LineOptions(self, line, 0, y_col, self.axes_list)
+        self.ui.tab_widget.setCurrentIndex(self.ui.tab_widget.addTab(w, f"Line {self.current_line_number}"))
+        self.current_line_number += 1
+
+    def detail_dialog(self):
+        ViewArrayDialog(self.data, self.windowTitle()).exec_()
+
+    def show(self):
+        super().show()
+        self.raise_()
+        self.activateWindow()
+
+    def resize_when_floating(self, is_toplevel):
+        """Resize to minimum (called when docked/undocked)"""
+        if is_toplevel:  # only when undocked
+            self.resize(0, 0)
+
+
+class FilePlotDialog(ArrayPlotDialog):
+    def __init__(self, filename, axes_list, date_format=None, *args, **kwargs):
+        super().__init__(array_from_file(filename, date_format), axes_list, *args, **kwargs, windowTitle=os.path.basename(filename))
+        self.filename = filename
+
+    def detail_dialog(self):
+        ViewFileDialog(self.data, self.filename).exec_()
+
+
+class AddAxesDialog(QDialog):
+    def __init__(self, fd, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fd = fd
+        self.ui = Ui_AddAxesOptions()
+        self.ui.setupUi(self)
+
+        self.ui.nrows.valueChanged.connect(self.update_max_index)
+        self.ui.ncols.valueChanged.connect(self.update_max_index)
+        self.update_max_index()
+
+    def update_max_index(self):
+        self.ui.index.setMaximum(self.ui.nrows.value() * self.ui.ncols.value())
+
+    def show(self):
+        super().show()
+        self.raise_()
+        self.activateWindow()
+
+
+class AxesLimDialog(QDialog):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ui = Ui_AxesLimOptions()
+        self.ui.setupUi(self)
+
+        self.current_ax = None
+        self.previous_values = None  # ((x1, x2), (y1, y2))
+
+        self.ui.xmin.setRange(float('-inf'), float('inf'))
+        self.ui.xmax.setRange(float('-inf'), float('inf'))
+        self.ui.ymin.setRange(float('-inf'), float('inf'))
+        self.ui.ymax.setRange(float('-inf'), float('inf'))
+
+        self.accepted.connect(self.set_axes_lim)
+
+        self.ui.load_current.pressed.connect(self.update_from_axes)
+        self.ui.load_previous.pressed.connect(self.update_from_previous)
+
+    def set_axes_lim(self):
+        self.previous_values = x, y = (self.ui.xmin.value(), self.ui.xmax.value()), (self.ui.ymin.value(), self.ui.ymax.value())
+        self.current_ax.set_xlim(x)
+        self.current_ax.set_ylim(y)
+        update()
+        self.ui.load_previous.setEnabled(True)
+
+    def update_from_axes(self):
+        s, e = self.current_ax.get_xlim()
+        self.ui.xmin.setValue(s)
+        self.ui.xmax.setValue(e)
+
+        s, e = self.current_ax.get_ylim()
+        self.ui.ymin.setValue(s)
+        self.ui.ymax.setValue(e)
+
+    def update_from_previous(self):
+        if self.previous_values:
+            (x1, x2), (y1, y2) = self.previous_values
+            self.ui.xmin.setValue(x1)
+            self.ui.xmax.setValue(x2)
+
+            self.ui.ymin.setValue(y1)
+            self.ui.ymax.setValue(y2)
+
+    def show(self, ax):
+        self.current_ax = ax
+        self.ui.axes_box.setText(axes_to_str(ax))
+        self.update_from_axes()
+
+        super().show()
+        self.raise_()
+        self.activateWindow()
+
+
+class AxesOptions(QWidget):
+    legend_locations = ("best", "upper right", "upper left", "lower right", "lower left",
+                        "upper center", "lower center", "center right", "center left", "center")
+    def __init__(self, axes, limit_dialog, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.axes = axes
+        self.ui = Ui_AxesOptions()
+        self.ui.setupUi(self)
+
+        self.ui.title.textEdited.connect(self.set_title)
+        self.ui.x_label.textEdited.connect(self.set_xlabel)
+        self.ui.y_label.textEdited.connect(self.set_ylabel)
+        self.ui.x_tick_type.currentTextChanged.connect(self.set_xticks)
+        self.ui.y_tick_type.currentTextChanged.connect(self.set_yticks)
+
+        self.ui.frame.stateChanged.connect(self.set_frame)
+        self.ui.grid.stateChanged.connect(self.set_grid)
+        self.ui.equal_aspect.stateChanged.connect(self.set_aspect)
+        self.ui.configure_limits.pressed.connect(lambda: limit_dialog.show(axes))
+        self.ui.tick_direction.currentIndexChanged.connect(self.set_tick_direction)
+
+        axes.plopy_legend_loc = None  # keeps track of legend loc for relabel(axes)
+        self.ui.legend_loc.currentIndexChanged.connect(self.set_legend_loc)
+
+        #self.ui.legend_loc.insertSeparator(1)
+        #self.ui.legend_loc.insertSeparator(5)
+        #self.ui.legend_loc.insertSeparator(9)
+
+    def setup(self, _=None):
+        self.ui.title.setText(self.axes.get_title())
+        self.ui.x_label.setText(self.axes.get_xlabel())
+        self.ui.y_label.setText(self.axes.get_ylabel())
+
+    def set_title(self, text):
+        self.axes.set_title(text)
+        update()
+
+    def set_xlabel(self, text):
+        self.axes.set_xlabel(text)
+        update()
+
+    def set_ylabel(self, text):
+        self.axes.set_ylabel(text)
+        update()
+
+    @staticmethod
+    def set_axis_ticks(axis, selection):
+        if selection.startswith("Normal"):
+            axis.set_major_locator(ticker.AutoLocator())
+            axis.set_major_formatter(ticker.ScalarFormatter())
+        elif selection.startswith("Date"):
+            l = mpldates.AutoDateLocator()
+            axis.set_major_locator(l)
+            axis.set_major_formatter(mpldates.AutoDateFormatter(l))
+        elif selection == "None":
+            axis.set_major_locator(ticker.NullLocator())
+
+        if selection.endswith("minor ticks"):
+            axis.set_minor_locator(ticker.AutoMinorLocator())
+        else:
+            axis.set_minor_locator(ticker.NullLocator())
+
+    def set_xticks(self, selection):
+        self.set_axis_ticks(self.axes.xaxis, selection)
+
+        try:
+            update()
+        except Exception as e:
+            print("Error when configuring x ticks:", e)
+            if selection != "None":
+                self.ui.x_tick_type.setCurrentText("None")  # note: this will re-run this function
+
+    def set_yticks(self, selection):
+        self.set_axis_ticks(self.axes.yaxis, selection)
+
+        try:
+            update()
+        except Exception as e:
+            print("Error when configuring y ticks:", e)
+            if selection != "None":
+                self.ui.y_tick_type.setCurrentText("None")  # note: this will re-run this function
+
+    def set_tick_direction(self, index):
+        self.axes.tick_params(which='both', direction=('out', 'in', 'inout')[index])
+        update()
+
+    def set_legend_loc(self, index):
+        self.axes.plopy_legend_loc = self.legend_locations[index]
+        relabel(self.axes)
+
+    def set_frame(self, b):
+        self.axes.set_frame_on(b)
+        update()
+
+    def set_grid(self, b):
+        self.axes.grid(b)
+        update()
+
+    def set_aspect(self, b):
+        self.axes.set_aspect('equal' if b else 'auto')
+        update()
+
+
+class FigureDialog(QDockWidget):
+    def __init__(self, mainwindow, axes_list, figure=fig, *args, **kwargs):
+        super().__init__(mainwindow, *args, **kwargs)
+        self.figure = figure
+        self.axes_list = axes_list
+        self.ui = Ui_FigureOptions()
+        self.ui.setupUi(self)
+
+        if figure._suptitle:
+            self.ui.title.setText(figure._suptitle.get_text())
+        self.ui.tight_layout.setCheckState(Qt.Checked if figure.get_tight_layout() else Qt.Unchecked)
+
+        self.ui.title.textChanged.connect(self.set_title)
+        self.ui.tight_layout.stateChanged.connect(self.set_layout)
+
+        self.axes_lim_dialog = AxesLimDialog()
+
+        for axes in figure.axes:
+            self.add_axes(axes)
+
+        self.add_axes_dialog = AddAxesDialog(self)
+        self.ui.axes_button.pressed.connect(self.add_axes_dialog.show)
+        self.add_axes_dialog.accepted.connect(self.create_axes)
+
+        self.ui.tab_widget.tabCloseRequested.connect(self.remove_tab)
+
+        self.topLevelChanged.connect(self.resize_when_floating)
+
+    def set_title(self, text):
+        self.figure.suptitle(text)
+        update()
+
+    def set_layout(self, b):
+        self.figure.set_tight_layout(True if b else None)
+        update()
+
+    def remove_tab(self, index):
+        widget = self.ui.tab_widget.widget(index)
+        if widget is not None:
+            n_lines = len(widget.axes.lines)
+            name = axes_to_str(widget.axes)
+            if n_lines and QMessageBox.Ok != QMessageBox.warning(self, "Plo.Py - Remove Axes?",
+                               f"Are you sure you want to delete {name}?\nIt still has {n_lines} line{'s' if n_lines != 1 else ''} attached.",
+                               QMessageBox.Ok | QMessageBox.Cancel):
+                return
+            self.axes_list.removeRow(self.axes_list.findItems(name)[0].row())  # remove axes name from dropdown
+            widget.axes.remove()
+            widget.deleteLater()
+        self.ui.tab_widget.removeTab(index)
+        update()
+
+    def add_axes(self, axes):
+        name = axes_to_str(axes)
+
+        self.axes_list.appendRow(QStandardItem(name))  # append axes name (updates all ComboBoxes)
+
+        tab = AxesOptions(axes, self.axes_lim_dialog)
+        self.ui.tab_widget.setCurrentIndex(self.ui.tab_widget.addTab(tab, name))
+        return tab
+
+    def create_axes(self):
+        d_ui = self.add_axes_dialog.ui
+        location = d_ui.nrows.value(), d_ui.ncols.value(), d_ui.index.value()
+        if self.axes_list.findItems(f"Axes {location}"):
+            print(f"Axes already exists at {location}, using that instead")
+            qapp.beep()
+            return
+        self.add_axes(self.figure.add_subplot(*location)).setup()
+        update()
+
+    def show(self):
+        for i in range(self.ui.tab_widget.count()):
+            self.ui.tab_widget.widget(i).setup()
+        super().show()
+        self.raise_()
+        self.activateWindow()
+
+    def resize_when_floating(self, is_toplevel):
+        """Resize to minimum (called when docked/undocked)"""
+        if is_toplevel:  # only when undocked
+            self.resize(0, 0)
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ui = Ui_MainWindow()
+        self.ui.setupUi(self)
+
+        self.icon = QIcon()
+        icon_path = os.path.join(os.path.dirname(__file__), "ui", "icon_")
+        self.icon.addFile(icon_path+"16x16.png", QSize(16, 16))
+        self.icon.addFile(icon_path+"24x24.png", QSize(24, 24))
+        self.setWindowIcon(self.icon)
+
+        self.dialogs = {}
+        self.axes_list = QStandardItemModel(self)
+
+        canvas = FigureCanvasCustom(fig)
+        self.ui.verticalLayout.addWidget(canvas)
+        nav = NavigationToolbar(canvas, self)
+        self.addToolBar(Qt.BottomToolBarArea, nav)
+
+        self.ui.action_load_data_file.triggered.connect(self.choose_data_files)
+        self.ui.action_load_data_file_set_format.triggered.connect(self.configure_parser)
+        self.ui.action_plot_options_load_data_file.triggered.connect(self.choose_data_files)
+        self.ui.action_load_data_file_advanced.triggered.connect(self.choose_data_files_adv)
+        self.ui.action_save_plot.triggered.connect(nav.save_figure)
+        self.ui.action_copy_plot.triggered.connect(self.copy_plot)
+
+        canvas.setContextMenuPolicy(Qt.ActionsContextMenu)
+        canvas.addAction(self.ui.action_save_plot)
+        canvas.addAction(self.ui.action_copy_plot)
+
+        for i, c in enumerate(rcParams['axes.prop_cycle'].by_key()['color']):
+            QColorDialog.setCustomColor(i, c)
+
+        self.ui.action_whatsthis.triggered.connect(lambda: QTimer.singleShot(200, QWhatsThis.enterWhatsThisMode))
+        self.ui.action_whatsthis.setVisible(False)
+        self.ui.action_website.triggered.connect(lambda: QDesktopServices.openUrl(self.ui.action_website.toolTip()))
+        self.ui.action_docs.triggered.connect(lambda: QDesktopServices.openUrl(self.ui.action_docs.toolTip()))
+
+        self.show()
+        qapp.processEvents()
+        self.adv_load_dialog = AdvancedLoadDialog(self)
+        self.figoptions = FigureDialog(self, self.axes_list)
+        self.ui.action_figure_options.triggered.connect(self.figoptions.show)
+        nav.edit_parameters = self.figoptions.show
+
+        self.add_existing_lines()
+        self.add_data_files(_files_to_load)
+        self.add_arrays(_data_to_load)
+
+    def choose_data_files(self, date_format=None):
+        filenames, extension = QFileDialog.getOpenFileNames(self,
+            "Plo.Py - Open Data File", None, "Text Files (*.txt *.csv *.dat);;All Files (*)")
+        self.add_data_files(filenames, date_format)
+
+    def choose_data_files_adv(self):
+        result = self.adv_load_dialog.exec_()
+        if result == QDialog.Accepted:
+            self.choose_data_files(str(self.adv_load_dialog.ui.date_format.currentText()) or None)
+
+    def add_data_files(self, filenames, date_format=None):
+        if filenames:
+            pbar = QProgressBar(maximum=len(filenames)+1, alignment=Qt.AlignCenter)
+            self.ui.statusbar.addPermanentWidget(pbar)
+
+            show_functions = []
+            error_messages = []
+
+            for i, filename in enumerate(filenames, start=1):
+                pbar.setFormat(f"Loading Files ({i}/{len(filenames)}): {os.path.basename(filename)}")
+                pbar.setValue(i)
+                qapp.processEvents()
+
+                try:
+                    dialog = FilePlotDialog(filename, self.axes_list, date_format, parent=self)
+                except Exception:
+                    # errors will be shown after all files have been attempted
+                    error_messages.append(f"Error when loading file '{filename}'\n\n{format_exc()}")
+                else:
+                    self.add_plot_dialog(dialog)
+                    show_functions.append(dialog.show)
+
+            for f in show_functions:
+                f()
+
+            self.ui.statusbar.removeWidget(pbar)
+            pbar.deleteLater()
+            qapp.alert(self)
+            qapp.processEvents()
+
+            for msg in error_messages:
+                QMessageBox.warning(self, "Plo.Py", msg)
+
+    def add_arrays(self, arrays):
+        show_functions = []
+        for array, name in arrays:
+            dialog = ArrayPlotDialog(array, self.axes_list, windowTitle=name, parent=self)
+            self.add_plot_dialog(dialog)
+            show_functions.append(dialog.show)
+
+        for f in show_functions:
+            f()
+
+    def add_existing_lines(self):
+        for axes in fig.axes:
+            for line in axes.lines:
+                dialog = ArrayPlotDialog(line.get_xydata(), self.axes_list, add_initial_line=False, windowTitle=line.get_label(), parent=self)
+                dialog.add_line(line)
+                self.add_plot_dialog(dialog)
+
+    def add_plot_dialog(self, dialog):
+        action = QAction(dialog.windowTitle(), self)
+        action.triggered.connect(dialog.show)
+        self.ui.menu_plot_options.addAction(action)
+
+        if hasattr(self.ui, 'action_plot_options_load_data_file'):
+            self.ui.action_plot_options_load_data_file.deleteLater()
+            del self.ui.action_plot_options_load_data_file
+
+    def copy_plot(self):
+        buffer = BytesIO()
+        fig.savefig(buffer)
+        qapp.clipboard().setImage(QImage.fromData(buffer.getvalue()))
+
+    def configure_parser(self):
+        d = ParserOptionsDialog(self)
+        d.exec_()
+        d.deleteLater()
 
 
 def start():
@@ -1160,25 +922,22 @@ def start():
     Open the GUI.
     Note that this function should be called after preselecting data.
     """
-    global _root
-
-    for file in sys.argv[1:]:
-        add_file(file)
+    global qapp
+    qapp = QApplication.instance()
+    if not qapp:
+        qapp = QApplication(sys.argv)
 
     # differentiate this from python.exe by giving it a unique id
     # (gets icon to show up in taskbar on windows)
+    # https://stackoverflow.com/questions/1551605/#1552105
     try:
-        from ctypes import windll
-        from random import random
-        windll.shell32.SetCurrentProcessExplicitAppUserModelID("plopy.{}".format(random()))
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('plopy.app.id')
     except Exception:
         pass
 
-    _root = _Window()
-    # set sizes
-    _root.update()
-    _root.minsize(_root.winfo_width()-100, _root.winfo_height()-10)
-    return _root.mainloop()
+    app = MainWindow()
+    return qapp.exec_()
 
 
 if __name__ == "__main__":

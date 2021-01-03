@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>900</width>
+    <height>700</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Plo.Py</string>
+  </property>
+  <property name="windowIcon">
+   <iconset theme="plopy_16x16.png">
+    <normaloff>.</normaloff>.</iconset>
+  </property>
+  <property name="animated">
+   <bool>false</bool>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="sizeGripEnabled">
+    <bool>false</bool>
+   </property>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>900</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu_file">
+    <property name="title">
+     <string>&amp;File</string>
+    </property>
+    <addaction name="action_load_data_file"/>
+    <addaction name="action_load_data_file_set_format"/>
+    <addaction name="action_load_data_file_advanced"/>
+    <addaction name="action_save_plot"/>
+    <addaction name="action_copy_plot"/>
+   </widget>
+   <widget class="QMenu" name="menu_edit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+    <widget class="QMenu" name="menu_plot_options">
+     <property name="statusTip">
+      <string>Options relating to a specific file or line, including the color or legend label</string>
+     </property>
+     <property name="title">
+      <string>Plot + Line Options</string>
+     </property>
+     <addaction name="action_plot_options_load_data_file"/>
+    </widget>
+    <addaction name="action_figure_options"/>
+    <addaction name="menu_plot_options"/>
+   </widget>
+   <widget class="QMenu" name="menu_help">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <property name="toolTipsVisible">
+     <bool>true</bool>
+    </property>
+    <addaction name="action_whatsthis"/>
+    <addaction name="action_website"/>
+    <addaction name="action_docs"/>
+   </widget>
+   <addaction name="menu_file"/>
+   <addaction name="menu_edit"/>
+   <addaction name="menu_help"/>
+  </widget>
+  <action name="action_load_data_file">
+   <property name="text">
+    <string>Load Data File...</string>
+   </property>
+   <property name="statusTip">
+    <string>Add one or more data files to be plotted, each with their own options pane</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="action_save_plot">
+   <property name="text">
+    <string>Save Plot...</string>
+   </property>
+   <property name="statusTip">
+    <string>Save the current plot as an image, PDF, or similar format</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="action_plot_options_load_data_file">
+   <property name="text">
+    <string>Load a Data File first...</string>
+   </property>
+  </action>
+  <action name="action_figure_options">
+   <property name="text">
+    <string>Figure + Axes Options</string>
+   </property>
+   <property name="statusTip">
+    <string>Options relating to the whole figure or to an axes, such as the title or scale</string>
+   </property>
+  </action>
+  <action name="action_copy_plot">
+   <property name="text">
+    <string>Copy Plot to Clipboard</string>
+   </property>
+   <property name="statusTip">
+    <string>Copy the current plot as an image to the clipboard</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+C</string>
+   </property>
+  </action>
+  <action name="action_whatsthis">
+   <property name="text">
+    <string>WhatsThis</string>
+   </property>
+   <property name="toolTip">
+    <string>Get detailed info by clicking on a GUI element</string>
+   </property>
+   <property name="statusTip">
+    <string>Get detailed info by clicking on a GUI element</string>
+   </property>
+  </action>
+  <action name="action_website">
+   <property name="text">
+    <string>Plo.Py Website</string>
+   </property>
+   <property name="toolTip">
+    <string>https://finnventor.github.io/python/#plopy</string>
+   </property>
+   <property name="statusTip">
+    <string>https://finnventor.github.io/python/#plopy</string>
+   </property>
+  </action>
+  <action name="action_load_data_file_set_format">
+   <property name="text">
+    <string>Choose Input Date Format...</string>
+   </property>
+   <property name="statusTip">
+    <string>Change the date format for reading input files (default: Year Month Day)</string>
+   </property>
+  </action>
+  <action name="action_docs">
+   <property name="text">
+    <string>Plo.Py Docs</string>
+   </property>
+   <property name="toolTip">
+    <string>https://plopy.readthedocs.io/</string>
+   </property>
+   <property name="statusTip">
+    <string>https://plopy.readthedocs.io/</string>
+   </property>
+  </action>
+  <action name="action_load_data_file_advanced">
+   <property name="text">
+    <string>Load Data File with Fast Date Processing...</string>
+   </property>
+   <property name="statusTip">
+    <string>Advanced Add Data File dialog to process dates faster by manually specifying the format</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
