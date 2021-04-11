@@ -851,14 +851,14 @@ class MainWindow(QMainWindow):
         self.ui.action_docs.triggered.connect(lambda: QDesktopServices.openUrl(self.ui.action_docs.toolTip()))
 
         self.show()
+        self.raise_()
+        self.activateWindow()
+
         qapp.processEvents()
         self.adv_load_dialog = AdvancedLoadDialog(self)
         self.figoptions = FigureDialog(self, self.axes_list)
         self.ui.action_figure_options.triggered.connect(self.figoptions.show)
         nav.edit_parameters = self.figoptions.show
-
-        self.raise_()
-        self.activateWindow()
 
         self.add_existing_lines()
         self.add_arrays(_data_to_load)
