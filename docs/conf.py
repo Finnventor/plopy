@@ -14,13 +14,13 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('./../'))
+sys.path.insert(0, os.path.abspath('./../../'))
 
 
 # -- Project information -----------------------------------------------------
 
 project = 'plopy'
-copyright = '2019, Finnventor'
+copyright = '2019-2021, Finnventor'
 author = 'Finnventor'
 
 # The short X.Y version
@@ -34,6 +34,8 @@ release = ''
 # If your documentation needs a minimal Sphinx version, state it here.
 #
 # needs_sphinx = '1.0'
+
+default_role = 'py:obj'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom

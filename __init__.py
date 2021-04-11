@@ -4,9 +4,10 @@ import sys
 import os.path
 from datetime import datetime
 from dateutil import parser as dateparser
-from dateutil.parser._parser import ParserError as DateParserError
-from traceback import format_exc
+from dateutil.parser import ParserError as DateParserError
+from traceback import format_exc, print_exc
 from io import BytesIO
+import warnings
 
 from PySide2.QtCore import *
 from PySide2.QtWidgets import *
@@ -49,16 +50,19 @@ def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
     Parameters
     ----------
     filename : str
+        The path to the file to be loaded.
     date_format : str or None
         If None, `dateutil.parser.parse` is used, which automatically
-        guesses the format (but uses `dateparserkw` to figure out
+        guesses the format (but uses `dateparser_kw` to figure out
         ambiguous dates).
         Otherwise, the str is used in `datetime.datetime.strptime`
         for faster loading.
     dateparser_kw : dict
         Keyword options for `dateutil.parser.parse`.
 
-    If the filename ends with ".csv" and the first line contains a ","
+    Notes
+    -----
+    If the filename ends with `.csv` and the first two lines contain a `,`
     lines will be split on commas only, otherwise on any combination
     of commas or whitespace.
 
@@ -67,13 +71,14 @@ def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
     the whole line is assumed to be a header and discarded.
 
     If `date_format` is specified, `datetime.datetime.strptime` is used
-    instead to parse dates.
+    instead to parse dates, which can run significantly faster
+    (31 vs 142 seconds on a 86 MB file).
     """
     data = []
     with open(filename) as file:
         if date_format:
             if filename.endswith(".csv"):
-                line = file.readline()
+                line = file.readline() + file.readline()
                 file.seek(0)
                 if "," in line:
                     for line in file:
@@ -98,7 +103,7 @@ def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
                     except ValueError:
                         try:
                             row.append(mpldates.date2num(datetime.strptime(val, date_format)))
-                        except DateParserError:
+                        except ValueError:
                             break
                 if len(row) > 1:
                     data.append(row)
@@ -130,7 +135,7 @@ def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
                     except ValueError:
                         try:
                             row.append(mpldates.date2num(dateparser.parse(val, **dateparser_kw)))
-                        except DateParserError:
+                        except ValueError:
                             break
                 if len(row) > 1:
                     data.append(row)
@@ -144,10 +149,10 @@ class ParserOptionsDialog(QDialog):
                        {"dayfirst":True, "yearfirst": True}]    # YDM
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)  # hide ? button
-
         self.ui = Ui_ParserOptionsDialog()
         self.ui.setupUi(self)
+
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)  # hide ? button
 
         try:
             self.ui.date_format.setCurrentIndex(self.date_formats_kw.index(dateparser_kw))
@@ -161,14 +166,22 @@ class ParserOptionsDialog(QDialog):
 
 
 fig = Figure()
+"""
+Instance of `matplotlib.figure.Figure`. Can be used to pre-configure the plot,
+just like when using ``fig, ax = plt.subplots()``
+"""
 ax = fig.add_subplot()
-
+"""
+A subplot of `fig`. Can be used to pre-configure the plot,
+just like when using ``fig, ax = plt.subplots()``, or removed and replaced
+by a grid of axes using `fig.add_subplot()`
+"""
 
 _files_to_load = []
 _data_to_load = []
 
 suppress_errors = False
-"""bool: Whether to hide errors and other output from add_file and add_array"""
+"""bool: Whether to hide errors and other output from `add_file` and `add_array.`"""
 
 
 def add_file(filename):
@@ -178,7 +191,7 @@ def add_file(filename):
     Parameters
     ----------
     filename : str
-        The file to be loaded (should be 2d).
+        The file to be loaded.
 
     Returns
     -------
@@ -187,14 +200,13 @@ def add_file(filename):
 
     Notes
     -----
-        `filename` should have at least 2 rows and 2 columns.
+        `filename` should have at least 2 rows and 2 columns of data.
     """
-    if os.path.isfile(filename):
-        _files_to_load.append(filename)
-        return True
-    if not suppress_errors:
+    if not suppress_errors and not os.path.isfile(filename):
         print(f"[PloPy]: '{filename}' is not a file.")
-    return False
+        return False
+    _files_to_load.append(filename)
+    return True
 
 
 def add_array(array, name=None, raise_=False):
@@ -203,10 +215,13 @@ def add_array(array, name=None, raise_=False):
 
     Parameters
     ----------
-    array : np.array or list-like of list-like of float
-        The data to be loaded (should be 2d).
+    array : np.array or iterable of iterable of float
+        The data to be loaded.
     name : str or None
         The name to be used for the tab.
+    raise : bool
+        Whether to raise the exception if one is caused
+        by converting the input to a numpy array.
 
     Returns
     -------
@@ -792,6 +807,15 @@ class MainWindow(QMainWindow):
         super().__init__(*args, **kwargs)
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+
+        _showwarning_old = warnings.showwarning
+        def show_warning_new(message, category, filename, lineno, file=None, line=None):
+            try:
+                self.ui.statusbar.showMessage(f"Warning: {message}", 20000)
+            except Exception:
+                print_exc()
+            _showwarning_old(message, category, filename, lineno, file, line)
+        warnings.showwarning = show_warning_new
 
         self.icon = QIcon()
         icon_path = os.path.join(os.path.dirname(__file__), "ui", "icon_")
