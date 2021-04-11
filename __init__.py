@@ -447,7 +447,7 @@ class LineOptions(QWidget):
     def update_color(self, dialog=True):
         color = to_hex(self.line.get_c())
         if dialog:
-            new_qcolor = QColorDialog.getColor(color)
+            new_qcolor = QColorDialog.getColor(color, self)
             if not new_qcolor.isValid():
                 return
             color = new_qcolor.name()  # to hex
