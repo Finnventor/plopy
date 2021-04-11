@@ -857,9 +857,12 @@ class MainWindow(QMainWindow):
         self.ui.action_figure_options.triggered.connect(self.figoptions.show)
         nav.edit_parameters = self.figoptions.show
 
+        self.raise_()
+        self.activateWindow()
+
         self.add_existing_lines()
-        self.add_data_files(_files_to_load)
         self.add_arrays(_data_to_load)
+        self.add_data_files(_files_to_load, always_alert=True)
 
     def choose_data_files(self, date_format=None):
         filenames, extension = QFileDialog.getOpenFileNames(self,
@@ -871,7 +874,7 @@ class MainWindow(QMainWindow):
         if result == QDialog.Accepted:
             self.choose_data_files(str(self.adv_load_dialog.ui.date_format.currentText()) or None)
 
-    def add_data_files(self, filenames, date_format=None):
+    def add_data_files(self, filenames, date_format=None, always_alert=False):
         if filenames:
             pbar = QProgressBar(maximum=len(filenames)+1, alignment=Qt.AlignCenter)
             self.ui.statusbar.addPermanentWidget(pbar)
@@ -903,6 +906,9 @@ class MainWindow(QMainWindow):
 
             for msg in error_messages:
                 QMessageBox.warning(self, "Plo.Py", msg)
+
+        elif always_alert:
+            qapp.alert(self)
 
     def add_arrays(self, arrays):
         show_functions = []
