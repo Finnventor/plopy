@@ -89,7 +89,7 @@ def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
                             except ValueError:
                                 try:
                                     row.append(mpldates.date2num(datetime.strptime(val, date_format)))
-                                except DateParserError:
+                                except ValueError:
                                     break
                         if len(row) > 1:
                             data.append(row)
@@ -135,7 +135,7 @@ def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
                     except ValueError:
                         try:
                             row.append(mpldates.date2num(dateparser.parse(val, **dateparser_kw)))
-                        except ValueError:
+                        except DateParserError:
                             break
                 if len(row) > 1:
                     data.append(row)
@@ -143,10 +143,10 @@ def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
 
 
 class ParserOptionsDialog(QDialog):
-    date_formats_kw = [{"dayfirst":False, "yearfirst": True},   # YMD
-                       {"dayfirst":True, "yearfirst": False},   # DMY
-                       {"dayfirst":False, "yearfirst": False},  # MDY
-                       {"dayfirst":True, "yearfirst": True}]    # YDM
+    date_formats_kw = [{"dayfirst": False, "yearfirst": True},   # YMD
+                       {"dayfirst": True, "yearfirst": False},   # DMY
+                       {"dayfirst": False, "yearfirst": False},  # MDY
+                       {"dayfirst": True, "yearfirst": True}]    # YDM
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ui = Ui_ParserOptionsDialog()
@@ -301,8 +301,8 @@ class FigureCanvasCustom(FigureCanvas):
 
 
 class ViewArrayDialog(QDialog):
-    def __init__(self, data, name, *args, **kwargs):
-        super().__init__(*args, **kwargs, windowTitle=f"Plo.Py - View {name}")
+    def __init__(self, parent, data, name, *args, **kwargs):
+        super().__init__(parent, *args, **kwargs, windowTitle=f"Plo.Py - View {name}")
         self.ui = Ui_ViewArrayDialog()
         self.ui.setupUi(self)
         self.data = data
@@ -325,9 +325,9 @@ class ViewArrayDialog(QDialog):
 
 
 class ViewFileDialog(ViewArrayDialog):
-    def __init__(self, data, filename, *args, **kwargs):
+    def __init__(self, parent, data, filename, *args, **kwargs):
         self.__has_loaded_raw = False
-        QDialog.__init__(self, *args, **kwargs, windowTitle=f"Plo.Py - View {os.path.basename(filename)}")
+        QDialog.__init__(self, parent, *args, **kwargs, windowTitle=f"Plo.Py - View {os.path.basename(filename)}")
         self.ui = Ui_ViewFileDialog()
         self.ui.setupUi(self)
         self.data = data
@@ -456,7 +456,7 @@ class LineOptions(QWidget):
         self.ui.color_frame.setStyleSheet(f"#color_frame {{background-color: {color}}}")
 
     def update_axes(self, text):
-        new_axes = next((axes for axes in fig.axes if axes_to_str(axes) == text), None)
+        new_axes = next((axes for axes in fig.axes if axes.plopy_name == text), None)
         if not new_axes:
             print(self.line, "could not be moved to a new axes.")
             return
@@ -476,13 +476,15 @@ class ArrayPlotDialog(QDockWidget):
         cls._title_count += 1
         return f"Array {cls._title_count}"
 
-    def __init__(self, data, axes_list, windowTitle=None, *args, add_initial_line=True, **kwargs):
-        assert len(data.shape) == 2  #  input data must be a 2D array
+    def __init__(self, parent, data, axes_list, windowTitle=None, *args, add_initial_line=True, **kwargs):
+        if len(data.shape) != 2:
+            raise ValueError(f"data.shape should have length 2, instead was {data.shape}")
+        self.parent = parent
         self.data = data
         self.axes_list = axes_list  # synced to update the line's axes chooser
         if not windowTitle:
             windowTitle = self.generate_title()
-        super().__init__(*args, **kwargs, windowTitle=windowTitle)
+        super().__init__(parent, *args, **kwargs, windowTitle=windowTitle)
         self.ui = Ui_PlotOptions()
         self.ui.setupUi(self)
 
@@ -520,7 +522,7 @@ class ArrayPlotDialog(QDockWidget):
         self.current_line_number += 1
 
     def detail_dialog(self):
-        ViewArrayDialog(self.data, self.windowTitle()).exec_()
+        ViewArrayDialog(self.parent, self.data, self.windowTitle()).exec_()
 
     def show(self):
         super().show()
@@ -534,12 +536,12 @@ class ArrayPlotDialog(QDockWidget):
 
 
 class FilePlotDialog(ArrayPlotDialog):
-    def __init__(self, filename, axes_list, date_format=None, *args, **kwargs):
-        super().__init__(array_from_file(filename, date_format), axes_list, *args, **kwargs, windowTitle=os.path.basename(filename))
+    def __init__(self, parent, filename, axes_list, date_format=None, *args, **kwargs):
+        super().__init__(parent, array_from_file(filename, date_format), axes_list, *args, **kwargs, windowTitle=os.path.basename(filename))
         self.filename = filename
 
     def detail_dialog(self):
-        ViewFileDialog(self.data, self.filename).exec_()
+        ViewFileDialog(self.parent, self.data, self.filename).exec_()
 
 
 class AddAxesDialog(QDialog):
@@ -551,12 +553,21 @@ class AddAxesDialog(QDialog):
 
         self.ui.nrows.valueChanged.connect(self.update_max_index)
         self.ui.ncols.valueChanged.connect(self.update_max_index)
-        self.update_max_index()
+        self.ui.index.valueChanged.connect(self.update_radiobutton_state)
 
     def update_max_index(self):
         self.ui.index.setMaximum(self.ui.nrows.value() * self.ui.ncols.value())
+        self.update_radiobutton_state()
+
+    def update_radiobutton_state(self):
+        location = self.ui.nrows.value(), self.ui.ncols.value(), self.ui.index.value()
+        exists = f"Axes {location}" in (axes.plopy_name for axes in fig.axes)
+        self.ui.radio_new.setEnabled(not exists)
+        self.ui.radio_twinx.setEnabled(exists)
+        self.ui.radio_twiny.setEnabled(exists)
 
     def show(self):
+        self.update_max_index()
         super().show()
         self.raise_()
         self.activateWindow()
@@ -608,7 +619,7 @@ class AxesLimDialog(QDialog):
 
     def show(self, ax):
         self.current_ax = ax
-        self.ui.axes_box.setText(axes_to_str(ax))
+        self.ui.axes_box.setText(ax.plopy_name)
         self.update_from_axes()
 
         super().show()
@@ -645,9 +656,15 @@ class AxesOptions(QWidget):
         #self.ui.legend_loc.insertSeparator(9)
 
     def setup(self, _=None):
-        self.ui.title.setText(self.axes.get_title())
-        self.ui.x_label.setText(self.axes.get_xlabel())
-        self.ui.y_label.setText(self.axes.get_ylabel())
+        if "Twin" in self.axes.plopy_name:
+            if "TwinX" in self.axes.plopy_name:
+                self.ui.x_gbox.setEnabled(False)
+                self.ui.y_label.setText(self.axes.get_ylabel())
+            else:
+                self.ui.y_gbox.setEnabled(False)
+                self.ui.x_label.setText(self.axes.get_xlabel())
+        else:
+            self.ui.title.setText(self.axes.get_title())
 
     def set_title(self, text):
         self.axes.set_title(text)
@@ -759,7 +776,7 @@ class FigureDialog(QDockWidget):
         widget = self.ui.tab_widget.widget(index)
         if widget is not None:
             n_lines = len(widget.axes.lines)
-            name = axes_to_str(widget.axes)
+            name = widget.axes.plopy_name
             if n_lines and QMessageBox.Ok != QMessageBox.warning(self, "Plo.Py - Remove Axes?",
                                f"Are you sure you want to delete {name}?\nIt still has {n_lines} line{'s' if n_lines != 1 else ''} attached.",
                                QMessageBox.Ok | QMessageBox.Cancel):
@@ -772,6 +789,23 @@ class FigureDialog(QDockWidget):
 
     def add_axes(self, axes):
         name = axes_to_str(axes)
+        if self.axes_list.findItems(name):  # axes already exists at that location, may be a twin
+            for other_ax in axes.get_shared_x_axes().get_siblings(axes):
+                if other_ax is axes:
+                    continue
+                if other_ax.bbox.bounds == axes.bbox.bounds:
+                    name += " TwinX"
+                    break
+            else:
+                for other_ax in axes.get_shared_y_axes().get_siblings(axes):
+                    if other_ax is axes:
+                        continue
+                    if other_ax.bbox.bounds == axes.bbox.bounds:
+                        name += " TwinY"
+                        break
+            while self.axes_list.findItems(name):
+                name += " copy"
+        axes.plopy_name = name
 
         self.axes_list.appendRow(QStandardItem(name))  # append axes name (updates all ComboBoxes)
 
@@ -782,11 +816,21 @@ class FigureDialog(QDockWidget):
     def create_axes(self):
         d_ui = self.add_axes_dialog.ui
         location = d_ui.nrows.value(), d_ui.ncols.value(), d_ui.index.value()
-        if self.axes_list.findItems(f"Axes {location}"):
-            print(f"Axes already exists at {location}, using that instead")
-            qapp.beep()
-            return
-        self.add_axes(self.figure.add_subplot(*location)).setup()
+        for axes in fig.axes:
+            if axes.plopy_name == f"Axes {location}":
+                if d_ui.radio_twinx.isChecked():
+                    new_ax = axes.twinx()
+                    break
+                elif d_ui.radio_twiny.isChecked():
+                    new_ax = axes.twiny()
+                    break
+                else:
+                    print(f"Axes already exists at {location}, using that instead")
+                    qapp.beep()
+                    return
+        else:
+            new_ax = self.figure.add_subplot(*location)
+        self.add_axes(new_ax).setup()
         update()
 
     def show(self):
@@ -888,7 +932,7 @@ class MainWindow(QMainWindow):
                 qapp.processEvents()
 
                 try:
-                    dialog = FilePlotDialog(filename, self.axes_list, date_format, parent=self)
+                    dialog = FilePlotDialog(self, filename, self.axes_list, date_format)
                 except Exception:
                     # errors will be shown after all files have been attempted
                     error_messages.append(f"Error when loading file '{filename}'\n\n{format_exc()}")
@@ -913,7 +957,7 @@ class MainWindow(QMainWindow):
     def add_arrays(self, arrays):
         show_functions = []
         for array, name in arrays:
-            dialog = ArrayPlotDialog(array, self.axes_list, windowTitle=name, parent=self)
+            dialog = ArrayPlotDialog(self, array, self.axes_list, windowTitle=name)
             self.add_plot_dialog(dialog)
             show_functions.append(dialog.show)
 
@@ -923,7 +967,7 @@ class MainWindow(QMainWindow):
     def add_existing_lines(self):
         for axes in fig.axes:
             for line in axes.lines:
-                dialog = ArrayPlotDialog(line.get_xydata(), self.axes_list, add_initial_line=False, windowTitle=line.get_label(), parent=self)
+                dialog = ArrayPlotDialog(self, line.get_xydata(), self.axes_list, add_initial_line=False, windowTitle=line.get_label())
                 dialog.add_line(line)
                 self.add_plot_dialog(dialog)
 

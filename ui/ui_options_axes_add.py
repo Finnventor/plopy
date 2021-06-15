@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'options_axes_adddchsDc.ui'
+## Form generated from reading UI file 'options_axes_addCaBkUs.ui'
 ##
 ## Created by: Qt User Interface Compiler version 5.15.0
 ##
@@ -127,8 +127,14 @@ class Ui_AddAxesOptions(object):
         self.dimensions_box.setTitle(QCoreApplication.translate("AddAxesOptions", u"Grid dimensions (all axes)", None))
         self.nrows_label.setText(QCoreApplication.translate("AddAxesOptions", u"Rows", None))
         self.ncols_label.setText(QCoreApplication.translate("AddAxesOptions", u"Columns", None))
+#if QT_CONFIG(tooltip)
+        self.radio_twiny.setToolTip(QCoreApplication.translate("AddAxesOptions", u"Add a new Axes with a shared y axis and a unique x axis", None))
+#endif // QT_CONFIG(tooltip)
         self.radio_twiny.setText(QCoreApplication.translate("AddAxesOptions", u"Add Twin Y", None))
+#if QT_CONFIG(tooltip)
+        self.radio_twinx.setToolTip(QCoreApplication.translate("AddAxesOptions", u"Add a new Axes with a shared x axis and a unique y axis", None))
+#endif // QT_CONFIG(tooltip)
         self.radio_twinx.setText(QCoreApplication.translate("AddAxesOptions", u"Add Twin X", None))
-        self.radio_new.setText(QCoreApplication.translate("AddAxesOptions", u"New / Overwrite", None))
+        self.radio_new.setText(QCoreApplication.translate("AddAxesOptions", u"New", None))
     # retranslateUi
 

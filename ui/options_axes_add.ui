@@ -121,6 +121,9 @@ the new Axes</string>
      <property name="enabled">
       <bool>false</bool>
      </property>
+     <property name="toolTip">
+      <string>Add a new Axes with a shared y axis and a unique x axis</string>
+     </property>
      <property name="text">
       <string>Add Twin Y</string>
      </property>
@@ -131,6 +134,9 @@ the new Axes</string>
      <property name="enabled">
       <bool>false</bool>
      </property>
+     <property name="toolTip">
+      <string>Add a new Axes with a shared x axis and a unique y axis</string>
+     </property>
      <property name="text">
       <string>Add Twin X</string>
      </property>
@@ -139,7 +145,7 @@ the new Axes</string>
    <item row="1" column="0" colspan="2">
     <widget class="QRadioButton" name="radio_new">
      <property name="text">
-      <string>New / Overwrite</string>
+      <string>New</string>
      </property>
      <property name="checked">
       <bool>true</bool>
