@@ -687,7 +687,7 @@ class AxesOptions(QWidget):
             l = mpldates.AutoDateLocator()
             axis.set_major_locator(l)
             axis.set_major_formatter(mpldates.AutoDateFormatter(l))
-        elif selection == "None":
+        elif selection == "Blank":
             axis.set_major_locator(ticker.NullLocator())
 
         if selection.endswith("minor ticks"):
@@ -696,24 +696,34 @@ class AxesOptions(QWidget):
             axis.set_minor_locator(ticker.NullLocator())
 
     def set_xticks(self, selection):
-        self.set_axis_ticks(self.axes.xaxis, selection)
-
         try:
+            if selection.endswith("Logarithmic"):
+                self.set_axis_ticks(self.axes.xaxis, "Normal")
+                self.axes.set_xscale('log' if selection == "Logarithmic" else 'symlog')
+            else:
+                self.axes.set_xscale('linear')
+                self.set_axis_ticks(self.axes.xaxis, selection)
+
             update()
         except Exception as e:
             print("Error when configuring x ticks:", e)
-            if selection != "None":
-                self.ui.x_tick_type.setCurrentText("None")  # note: this will re-run this function
+            if selection != "Blank":
+                self.ui.x_tick_type.setCurrentText("Blank")  # note: this will re-run this function
 
     def set_yticks(self, selection):
-        self.set_axis_ticks(self.axes.yaxis, selection)
-
         try:
+            if selection.endswith("Logarithmic"):
+                self.set_axis_ticks(self.axes.yaxis, "Normal")
+                self.axes.set_yscale('log' if selection == "Logarithmic" else 'symlog')
+            else:
+                self.axes.set_yscale('linear')
+                self.set_axis_ticks(self.axes.yaxis, selection)
+
             update()
         except Exception as e:
             print("Error when configuring y ticks:", e)
-            if selection != "None":
-                self.ui.y_tick_type.setCurrentText("None")  # note: this will re-run this function
+            if selection != "Blank":
+                self.ui.y_tick_type.setCurrentText("Blank")  # note: this will re-run this function
 
     def set_tick_direction(self, index):
         self.axes.tick_params(which='both', direction=('out', 'in', 'inout')[index])
@@ -751,7 +761,7 @@ class FigureDialog(QDockWidget):
         self.ui.title.textChanged.connect(self.set_title)
         self.ui.tight_layout.stateChanged.connect(self.set_layout)
 
-        self.axes_lim_dialog = AxesLimDialog()
+        self.axes_lim_dialog = AxesLimDialog(mainwindow)
 
         for axes in figure.axes:
             self.add_axes(axes)

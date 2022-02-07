@@ -40,7 +40,7 @@
       <item row="1" column="0">
        <widget class="QLabel" name="y_tick_type_label">
         <property name="text">
-         <string>Tick Type</string>
+         <string>Type</string>
         </property>
         <property name="buddy">
          <cstring>y_tick_type</cstring>
@@ -66,7 +66,17 @@
         </item>
         <item>
          <property name="text">
-          <string>None</string>
+          <string>Symmetric Logarithmic</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Logarithmic</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Blank</string>
          </property>
         </item>
        </widget>
@@ -155,7 +165,7 @@
       <item row="1" column="0">
        <widget class="QLabel" name="x_tick_type_label">
         <property name="text">
-         <string>Tick Type</string>
+         <string>Type</string>
         </property>
         <property name="buddy">
          <cstring>x_tick_type</cstring>
@@ -181,7 +191,17 @@
         </item>
         <item>
          <property name="text">
-          <string>None</string>
+          <string>Symmetric Logarithmic</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Logarithmic</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Blank</string>
          </property>
         </item>
        </widget>

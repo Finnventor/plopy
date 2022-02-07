@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'options_axesSvIpVr.ui'
+## Form generated from reading UI file 'options_axesLROStK.ui'
 ##
 ## Created by: Qt User Interface Compiler version 5.15.0
 ##
@@ -45,6 +45,8 @@ class Ui_AxesOptions(object):
         self.formLayout_4.setWidget(1, QFormLayout.LabelRole, self.y_tick_type_label)
 
         self.y_tick_type = QComboBox(self.y_gbox)
+        self.y_tick_type.addItem("")
+        self.y_tick_type.addItem("")
         self.y_tick_type.addItem("")
         self.y_tick_type.addItem("")
         self.y_tick_type.addItem("")
@@ -107,6 +109,8 @@ class Ui_AxesOptions(object):
         self.formLayout.setWidget(1, QFormLayout.LabelRole, self.x_tick_type_label)
 
         self.x_tick_type = QComboBox(self.x_gbox)
+        self.x_tick_type.addItem("")
+        self.x_tick_type.addItem("")
         self.x_tick_type.addItem("")
         self.x_tick_type.addItem("")
         self.x_tick_type.addItem("")
@@ -191,22 +195,26 @@ class Ui_AxesOptions(object):
     def retranslateUi(self, AxesOptions):
         self.y_gbox.setTitle(QCoreApplication.translate("AxesOptions", u"Y-Axis", None))
         self.y_label_label.setText(QCoreApplication.translate("AxesOptions", u"Label", None))
-        self.y_tick_type_label.setText(QCoreApplication.translate("AxesOptions", u"Tick Type", None))
+        self.y_tick_type_label.setText(QCoreApplication.translate("AxesOptions", u"Type", None))
         self.y_tick_type.setItemText(0, QCoreApplication.translate("AxesOptions", u"Normal", None))
         self.y_tick_type.setItemText(1, QCoreApplication.translate("AxesOptions", u"Normal, minor ticks", None))
         self.y_tick_type.setItemText(2, QCoreApplication.translate("AxesOptions", u"Date", None))
-        self.y_tick_type.setItemText(3, QCoreApplication.translate("AxesOptions", u"None", None))
+        self.y_tick_type.setItemText(3, QCoreApplication.translate("AxesOptions", u"Symmetric Logarithmic", None))
+        self.y_tick_type.setItemText(4, QCoreApplication.translate("AxesOptions", u"Logarithmic", None))
+        self.y_tick_type.setItemText(5, QCoreApplication.translate("AxesOptions", u"Blank", None))
 
         self.title_label.setText(QCoreApplication.translate("AxesOptions", u"Axes Title:", None))
         self.legend_loc_label.setText(QCoreApplication.translate("AxesOptions", u"Legend Location:", None))
         self.equal_aspect.setText(QCoreApplication.translate("AxesOptions", u"1:1 Aspect Ratio", None))
         self.x_gbox.setTitle(QCoreApplication.translate("AxesOptions", u"X-Axis", None))
         self.x_label_label.setText(QCoreApplication.translate("AxesOptions", u"Label", None))
-        self.x_tick_type_label.setText(QCoreApplication.translate("AxesOptions", u"Tick Type", None))
+        self.x_tick_type_label.setText(QCoreApplication.translate("AxesOptions", u"Type", None))
         self.x_tick_type.setItemText(0, QCoreApplication.translate("AxesOptions", u"Normal", None))
         self.x_tick_type.setItemText(1, QCoreApplication.translate("AxesOptions", u"Normal, minor ticks", None))
         self.x_tick_type.setItemText(2, QCoreApplication.translate("AxesOptions", u"Date", None))
-        self.x_tick_type.setItemText(3, QCoreApplication.translate("AxesOptions", u"None", None))
+        self.x_tick_type.setItemText(3, QCoreApplication.translate("AxesOptions", u"Symmetric Logarithmic", None))
+        self.x_tick_type.setItemText(4, QCoreApplication.translate("AxesOptions", u"Logarithmic", None))
+        self.x_tick_type.setItemText(5, QCoreApplication.translate("AxesOptions", u"Blank", None))
 
         self.legend_loc.setItemText(0, QCoreApplication.translate("AxesOptions", u"Auto", None))
         self.legend_loc.setItemText(1, QCoreApplication.translate("AxesOptions", u"Top Right", None))
