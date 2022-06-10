@@ -35,6 +35,7 @@ from .ui.ui_options_parser import Ui_ParserOptionsDialog
 
 
 rcParams['savefig.directory'] = ""
+rcParams['savefig.transparent'] = True
 
 
 __all__ = 'array_from_file', 'add_file', 'add_array', 'start', 'fig', 'ax'
@@ -991,9 +992,16 @@ class MainWindow(QMainWindow):
             del self.ui.action_plot_options_load_data_file
 
     def copy_plot(self):
-        buffer = BytesIO()
-        fig.savefig(buffer)
-        qapp.clipboard().setImage(QImage.fromData(buffer.getvalue()))
+        #buffer = BytesIO()
+        #fig.savefig(buffer)
+        #qapp.clipboard().setImage(QImage.fromData(buffer.getvalue()))
+        #fig.savefig(buffer, format='rgba')
+        #buffer.seek(0)
+        #print(buffer.getvalue())
+        qapp.clipboard().setImage(QImage(fig.canvas.buffer_rgba(), *(fig.get_size_inches()*fig.dpi), QImage.Format_ARGB32))
+        #qapp.clipboard().setImage(QImage(buffer.getvalue(), *(fig.get_size_inches()*fig.dpi), QImage.Format_ARGB32))
+        #qapp.clipboard().setImage(buffer)#QImage.fromData(buffer.getvalue(), format=QImage.Format_ARGB32))
+        #buffer.close()
 
     def configure_parser(self):
         d = ParserOptionsDialog(self)
