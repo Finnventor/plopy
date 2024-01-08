@@ -11,7 +11,7 @@ import warnings
 
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
-from PySide6.QtGui import QStandardItemModel, QStandardItem, QImage, QIcon, QDesktopServices
+from PySide6.QtGui import QStandardItemModel, QStandardItem, QImage, QIcon, QAction, QDesktopServices
 
 import numpy as np
 
@@ -893,6 +893,7 @@ class MainWindow(QMainWindow):
         self.ui.action_copy_plot.triggered.connect(self.copy_plot)
 
         canvas.setContextMenuPolicy(Qt.ActionsContextMenu)
+        #canvas.setContextMenuPolicy(Qt.NoContextMenu)
         canvas.addAction(self.ui.action_save_plot)
         canvas.addAction(self.ui.action_copy_plot)
 
@@ -909,10 +910,23 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
         qapp.processEvents()
+
         self.adv_load_dialog = AdvancedLoadDialog(self)
         self.figoptions = FigureDialog(self, self.axes_list)
         self.ui.action_figure_options.triggered.connect(self.figoptions.show)
         nav.edit_parameters = self.figoptions.show
+
+        def rightclick_decorator(func):
+            def new_func(*args, **kw):
+                func(*args, **kw)
+                if nav.mode:
+                    canvas.setContextMenuPolicy(Qt.NoContextMenu)
+                else:
+                    canvas.setContextMenuPolicy(Qt.ActionsContextMenu)
+            return new_func
+        nav.zoom = rightclick_decorator(nav.zoom)
+        nav.pan = rightclick_decorator(nav.pan)
+        #print(dir(nav))
 
         self.add_existing_lines()
         self.add_arrays(_data_to_load)
