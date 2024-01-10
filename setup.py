@@ -12,7 +12,7 @@ setuptools.setup(
     url="https://github.com/Finnventor/plopy",
     packages=setuptools.find_packages(),
     package_data={'plopy': ['*.txt'], 'plopy.ui': ['*.png']},
-    install_requires=['python-dateutil>=2.8.1', 'PySide6', 'matplotlib'],
+    install_requires=['python-dateutil>=2.8.1', 'PySide6-Essentials', 'matplotlib'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
