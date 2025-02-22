@@ -502,7 +502,10 @@ class ArrayPlotDialog(QDockWidget):
         widget = self.ui.tab_widget.widget(index)
         if widget is not None:
             axes = widget.line.axes
-            axes.lines.remove(widget.line)
+            try:
+                widget.line.remove()
+            except AttributeError:
+                axes.lines.remove(widget.line)
             relim(axes)
             widget.deleteLater()
         self.ui.tab_widget.removeTab(index)
