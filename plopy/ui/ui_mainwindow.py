@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'mainwindowEOLRdV.ui'
+## Form generated from reading UI file 'mainwindownlQsKO.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.6.1
+## Created by: Qt User Interface Compiler version 6.9.1
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -47,6 +47,8 @@ class Ui_MainWindow(object):
         self.action_docs.setObjectName(u"action_docs")
         self.action_load_data_file_advanced = QAction(MainWindow)
         self.action_load_data_file_advanced.setObjectName(u"action_load_data_file_advanced")
+        self.action_save_py = QAction(MainWindow)
+        self.action_save_py.setObjectName(u"action_save_py")
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.verticalLayout = QVBoxLayout(self.centralwidget)
@@ -56,7 +58,7 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QStatusBar(MainWindow)
         self.statusbar.setObjectName(u"statusbar")
-        self.statusbar.setSizeGripEnabled(True)
+        self.statusbar.setSizeGripEnabled(False)
         MainWindow.setStatusBar(self.statusbar)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
@@ -80,6 +82,7 @@ class Ui_MainWindow(object):
         self.menu_file.addAction(self.action_load_data_file_advanced)
         self.menu_file.addAction(self.action_save_plot)
         self.menu_file.addAction(self.action_copy_plot)
+        self.menu_file.addAction(self.action_save_py)
         self.menu_edit.addAction(self.action_figure_options)
         self.menu_edit.addAction(self.menu_plot_options.menuAction())
         self.menu_plot_options.addAction(self.action_plot_options_load_data_file)
@@ -101,7 +104,7 @@ class Ui_MainWindow(object):
 #if QT_CONFIG(shortcut)
         self.action_load_data_file.setShortcut(QCoreApplication.translate("MainWindow", u"Ctrl+O", None))
 #endif // QT_CONFIG(shortcut)
-        self.action_save_plot.setText(QCoreApplication.translate("MainWindow", u"Save Plot...", None))
+        self.action_save_plot.setText(QCoreApplication.translate("MainWindow", u"Save Plot Image...", None))
 #if QT_CONFIG(statustip)
         self.action_save_plot.setStatusTip(QCoreApplication.translate("MainWindow", u"Save the current plot as an image, PDF, or similar format", None))
 #endif // QT_CONFIG(statustip)
@@ -113,7 +116,7 @@ class Ui_MainWindow(object):
 #if QT_CONFIG(statustip)
         self.action_figure_options.setStatusTip(QCoreApplication.translate("MainWindow", u"Options relating to the whole figure or to an axes, such as the title or scale", None))
 #endif // QT_CONFIG(statustip)
-        self.action_copy_plot.setText(QCoreApplication.translate("MainWindow", u"Copy Plot to Clipboard", None))
+        self.action_copy_plot.setText(QCoreApplication.translate("MainWindow", u"Copy Image to Clipboard", None))
 #if QT_CONFIG(statustip)
         self.action_copy_plot.setStatusTip(QCoreApplication.translate("MainWindow", u"Copy the current plot as an image to the clipboard", None))
 #endif // QT_CONFIG(statustip)
@@ -148,6 +151,13 @@ class Ui_MainWindow(object):
         self.action_load_data_file_advanced.setText(QCoreApplication.translate("MainWindow", u"Load Data File with Fast Date Processing...", None))
 #if QT_CONFIG(statustip)
         self.action_load_data_file_advanced.setStatusTip(QCoreApplication.translate("MainWindow", u"Advanced Add Data File dialog to process dates faster by manually specifying the format", None))
+#endif // QT_CONFIG(statustip)
+        self.action_save_py.setText(QCoreApplication.translate("MainWindow", u"Save interactive plot *.py", None))
+#if QT_CONFIG(tooltip)
+        self.action_save_py.setToolTip(QCoreApplication.translate("MainWindow", u"Save interactive plot *.py", None))
+#endif // QT_CONFIG(tooltip)
+#if QT_CONFIG(statustip)
+        self.action_save_py.setStatusTip(QCoreApplication.translate("MainWindow", u"Save the current plot as a Python program for interactive viewing or editing", None))
 #endif // QT_CONFIG(statustip)
         self.menu_file.setTitle(QCoreApplication.translate("MainWindow", u"&File", None))
         self.menu_edit.setTitle(QCoreApplication.translate("MainWindow", u"Edit", None))

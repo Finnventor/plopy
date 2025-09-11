@@ -37,7 +37,7 @@ from .ui.ui_options_parser import Ui_ParserOptionsDialog
 rcParams['savefig.directory'] = ""
 
 
-__all__ = 'array_from_file', 'add_file', 'add_array', 'start', 'fig', 'ax'
+__all__ = 'array_from_file', 'labels_from_file', 'add_file', 'add_array', 'start', 'fig', 'ax'
 
 
 dateparser_kw = {}
@@ -140,6 +140,34 @@ def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
                 if len(row) > 1:
                     data.append(row)
     return np.array(data)
+
+
+def labels_from_file(filename, cols=None, csv=True):
+    with open(filename) as file:
+        if cols and cols > 1:
+            if csv:
+                for i in range(10):
+                    line = file.readline().split(",")
+                    if len(line) == cols:
+                        return [i.strip() for i in line]
+                file.seek(0)
+
+            for i in range(10):
+                line = file.readline().replace(",", " ").split()
+                if len(line) == cols:
+                    #print('correct length label:', line)
+                    return line
+            file.seek(0)
+        for i in range(10):
+            line = file.readline().replace(",", " ").split()
+            if line:
+                try:
+                    float(line[0])
+                    continue
+                except ValueError:
+                    #print('any length label:', line)
+                    return line
+    return []
 
 
 class ParserOptionsDialog(QDialog):
@@ -279,10 +307,14 @@ def relim(axes, draw=True):
     axes.autoscale()
     relabel(axes, draw)
 
+def axes_to_tuple(axes):
+    """Return the location of the axes as the tuple (`nrows`, `ncols`, `index`), similar to `fig.add_subplot()` """
+    g = axes.get_gridspec()
+    return (g.nrows, g.ncols, axes.get_subplotspec().num1+1)
 
 def axes_to_str(axes):
     """Return the location of the axes as the string "Axes (`nrows`, `ncols`, `index`)" """
-    return f"Axes {str(axes.get_gridspec())[8:-1]}, {axes.get_subplotspec().num1+1})"
+    return f"Axes {axes_to_tuple(axes)}"
 
 
 class FigureCanvasCustom(FigureCanvas):
@@ -476,12 +508,13 @@ class ArrayPlotDialog(QDockWidget):
         cls._title_count += 1
         return f"Array {cls._title_count}"
 
-    def __init__(self, parent, data, axes_list, windowTitle=None, *args, add_initial_line=True, **kwargs):
+    def __init__(self, parent, data, axes_list, labels=None, windowTitle=None, *args, add_initial_line=True, **kwargs):
         if len(data.shape) != 2:
             raise ValueError(f"data.shape should have length 2, instead was {data.shape}")
         self.parent = parent
         self.data = data
         self.axes_list = axes_list  # synced to update the line's axes chooser
+        self.labels = labels
         if not windowTitle:
             windowTitle = self.generate_title()
         super().__init__(parent, *args, **kwargs, windowTitle=windowTitle)
@@ -511,9 +544,12 @@ class ArrayPlotDialog(QDockWidget):
         self.ui.tab_widget.removeTab(index)
 
     def add_new_line(self):
+        if self.labels and len(self.labels) > self.current_line_number:
+            label = self.labels[self.current_line_number]
+        else:
+            label = f"{self.windowTitle()} Line {self.current_line_number}"
         y_col = self.current_line_number if self.current_line_number < self.data.shape[1] else 1
-        line, = fig.axes[0].plot(self.data[:, 0], self.data[:, y_col],
-                                 label=f"{self.windowTitle()} Line {self.current_line_number}")
+        line, = fig.axes[0].plot(self.data[:, 0], self.data[:, y_col], label=label)
         self.add_line(line)
 
         relabel(line.axes)
@@ -540,7 +576,8 @@ class ArrayPlotDialog(QDockWidget):
 
 class FilePlotDialog(ArrayPlotDialog):
     def __init__(self, parent, filename, axes_list, date_format=None, *args, **kwargs):
-        super().__init__(parent, array_from_file(filename, date_format), axes_list, *args, **kwargs, windowTitle=os.path.basename(filename))
+        data = array_from_file(filename, date_format)
+        super().__init__(parent, data, axes_list, *args, **kwargs, labels=labels_from_file(filename, cols=data.shape[1] if len(data.shape) > 1 else None), windowTitle=os.path.basename(filename))
         self.filename = filename
 
     def detail_dialog(self):
@@ -829,8 +866,9 @@ class FigureDialog(QDockWidget):
     def create_axes(self):
         d_ui = self.add_axes_dialog.ui
         location = d_ui.nrows.value(), d_ui.ncols.value(), d_ui.index.value()
+        name = f"Axes {location}"
         for axes in fig.axes:
-            if axes.plopy_name == f"Axes {location}":
+            if axes.plopy_name == name:
                 if d_ui.radio_twinx.isChecked():
                     new_ax = axes.twinx()
                     break
@@ -894,6 +932,7 @@ class MainWindow(QMainWindow):
         self.ui.action_load_data_file_advanced.triggered.connect(self.choose_data_files_adv)
         self.ui.action_save_plot.triggered.connect(nav.save_figure)
         self.ui.action_copy_plot.triggered.connect(self.copy_plot)
+        self.ui.action_save_py.triggered.connect(self.save_py)
 
         canvas.setContextMenuPolicy(Qt.ActionsContextMenu)
         #canvas.setContextMenuPolicy(Qt.NoContextMenu)
@@ -937,7 +976,7 @@ class MainWindow(QMainWindow):
 
     def choose_data_files(self, date_format=None):
         filenames, extension = QFileDialog.getOpenFileNames(self,
-            "Plo.Py - Open Data File", None, "Text Files (*.txt *.csv *.dat);;All Files (*)")
+            "Plo.Py - Open Data Files", None, "Text Files (*.txt *.csv *.dat);;All Files (*)")
         self.add_data_files(filenames, date_format)
 
     def choose_data_files_adv(self):
@@ -1017,6 +1056,64 @@ class MainWindow(QMainWindow):
         d.exec_()
         d.deleteLater()
 
+    def save_py(self):
+        filename, extension = QFileDialog.getSaveFileName(self,
+            "Plo.Py - Save Python file", None, "Python Files (*.py *.pyw);;All Files (*)")
+        if filename:
+            export(filename)
+
+
+def export_axes(f, ax, name='ax'):
+    if not ax.get_frame_on():
+        f.write(f"{name}.set_frame_on(False)\n")
+
+    for line in ax.lines:
+        f.write(f"""{name}.plot(
+    {list(line.get_xdata())},
+    {list(line.get_ydata())},
+    color={repr(line.get_color())}, ls={repr(line.get_linestyle())}, lw={line.get_linewidth()}, marker={repr(line.get_marker())}, ms={line.get_markersize()},
+    label={repr(line.get_label())}
+)
+""")
+
+def export(filename, figure=fig):
+    with open(filename, "w") as f:
+        f.write("""use_plopy = True
+
+if use_plopy:
+    try:
+        from plopy import fig, ax, start
+    except ImportError:
+        use_plopy = False
+if not use_plopy:
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+
+""")
+        if len(fig.axes) == 1:
+            export_axes(f, ax)
+
+        else:
+            f.write("ax.remove()\n")
+
+            for i, axes in enumerate(fig.axes, start=1):
+                name = f'ax{i}'
+                f.write(f"""
+{name} = fig.add_subplot{axes_to_tuple(axes)}
+{name}.grid({axes.xaxis.get_gridlines()[0].get_visible()})
+""")
+                export_axes(f, ax, name)
+        # self.axes.tick_params(which='both', direction=('out', 'in', 'inout')[index])
+
+        #self.axes.plopy_legend_loc = self.legend_locations[index]
+
+        #self.axes.set_frame_on(b)
+        # def set_aspect(self, b):
+            #  self.axes.set_aspect('equal' if b else 'auto')
+            #  update()
+
+        f.write("\nif use_plopy: start()\nelse: plt.show()\n")
+
 
 def start():
     """
@@ -1039,6 +1136,8 @@ def start():
 
     app = MainWindow()
     return qapp.exec_()
+
+show = start
 
 
 if __name__ == "__main__":

@@ -14,8 +14,7 @@
    <string>Plo.Py</string>
   </property>
   <property name="windowIcon">
-   <iconset theme="plopy_16x16.png">
-    <normaloff>.</normaloff>.</iconset>
+   <iconset theme="plopy_16x16.png"/>
   </property>
   <property name="animated">
    <bool>false</bool>
@@ -50,7 +49,7 @@
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>21</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menu_file">
@@ -62,6 +61,7 @@
     <addaction name="action_load_data_file_advanced"/>
     <addaction name="action_save_plot"/>
     <addaction name="action_copy_plot"/>
+    <addaction name="action_save_py"/>
    </widget>
    <widget class="QMenu" name="menu_edit">
     <property name="title">
@@ -107,7 +107,7 @@
   </action>
   <action name="action_save_plot">
    <property name="text">
-    <string>Save Plot...</string>
+    <string>Save Plot Image...</string>
    </property>
    <property name="statusTip">
     <string>Save the current plot as an image, PDF, or similar format</string>
@@ -131,7 +131,7 @@
   </action>
   <action name="action_copy_plot">
    <property name="text">
-    <string>Copy Plot to Clipboard</string>
+    <string>Copy Image to Clipboard</string>
    </property>
    <property name="statusTip">
     <string>Copy the current plot as an image to the clipboard</string>
@@ -187,6 +187,17 @@
    </property>
    <property name="statusTip">
     <string>Advanced Add Data File dialog to process dates faster by manually specifying the format</string>
+   </property>
+  </action>
+  <action name="action_save_py">
+   <property name="text">
+    <string>Save interactive plot *.py</string>
+   </property>
+   <property name="toolTip">
+    <string>Save interactive plot *.py</string>
+   </property>
+   <property name="statusTip">
+    <string>Save the current plot as a Python program for interactive viewing or editing</string>
    </property>
   </action>
  </widget>
