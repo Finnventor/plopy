@@ -5,7 +5,7 @@ with open("./README.rst", "r") as fh:
 
 setuptools.setup(
     name="plopy",
-    version="1.6.10",
+    version="1.7.0",
     author="Finnventor",
     description="GUI for matplotlib graphing",
     long_description=long_description,
