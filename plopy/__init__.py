@@ -17,7 +17,6 @@ import numpy as np
 
 from matplotlib import rcParams, ticker, dates as mpldates
 from matplotlib.figure import Figure
-from matplotlib.lines import Line2D
 from matplotlib.colors import to_hex
 from matplotlib.backends.backend_qt5agg import FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 
@@ -42,7 +41,7 @@ __all__ = 'array_from_file', 'labels_from_file', 'add_file', 'add_array', 'start
 
 dateparser_kw = {}
 
-def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
+def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw, error=True):
     """
     Get a 2D numpy array of float (or date represented as float in
     the matplotlib standard) from a file.
@@ -139,7 +138,26 @@ def array_from_file(filename, date_format=None, dateparser_kw=dateparser_kw):
                             break
                 if len(row) > 1:
                     data.append(row)
-    return np.array(data)
+    if error:
+        if not data:
+            raise ValueError(f"No data in {filename}")
+    try:
+        return np.array(data)
+    except ValueError:
+        cols = {}
+        examples = {}
+        for row in data:
+            length = len(row)
+            if length not in cols:
+                examples[length] = row
+            cols[length] = cols.get(length, 0) + 1
+        msg = f"""File has inconsistent column length.\n\nColumns in {filename}:
+"""+ "\n".join(f"{length} columns x{cols[length]}, example: {examples[length]}" for length in sorted(cols.keys()))
+        if error:
+            raise ValueError(msg)
+        msg += "\nCould not convert to 2D array, returning list instead"
+        warnings.warn(msg)
+    return data
 
 
 def labels_from_file(filename, cols=None, csv=True):
@@ -333,11 +351,14 @@ class FigureCanvasCustom(FigureCanvas):
 
 
 class ViewArrayDialog(QDialog):
-    def __init__(self, parent, data, name, *args, **kwargs):
+    def __init__(self, parent, data, name="Array", labels=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs, windowTitle=f"Plo.Py - View {name}")
         self.ui = Ui_ViewArrayDialog()
         self.ui.setupUi(self)
+        self.setModal(False)
+        self.setWindowModality(Qt.NonModal)
         self.data = data
+        self.labels = labels
 
         self.ui.data_load_all.pressed.connect(self.populate_table)
         self.populate_table(max=20)
@@ -348,22 +369,35 @@ class ViewArrayDialog(QDialog):
             if xlen > max: xlen = max
             if ylen > max: ylen = max
 
+        xmin = 0
+        if self.labels:
+            xmin = 1
+            xlen += 1
+
         self.ui.data_table.setRowCount(xlen)
         self.ui.data_table.setColumnCount(ylen)
 
-        for x in range(xlen):
+        if self.labels:
+            for y in range(min(xlen, len(self.labels))):
+                self.ui.data_table.setItem(0, y, QTableWidgetItem(self.labels[y]))
+
+        for x in range(xmin, xlen):
             for y in range(ylen):
-                self.ui.data_table.setItem(x, y, QTableWidgetItem(str(self.data[x, y])))
+                self.ui.data_table.setItem(x, y, QTableWidgetItem(str(self.data[x-xmin, y])))
 
 
 class ViewFileDialog(ViewArrayDialog):
-    def __init__(self, parent, data, filename, *args, **kwargs):
+    def __init__(self, parent, data, filename, labels=None, *args, **kwargs):
         self.__has_loaded_raw = False
         QDialog.__init__(self, parent, *args, **kwargs, windowTitle=f"Plo.Py - View {os.path.basename(filename)}")
         self.ui = Ui_ViewFileDialog()
         self.ui.setupUi(self)
+        self.setModal(False)
+        self.setWindowModality(Qt.NonModal)
+        self.setWindowFlags(Qt.Tool)
         self.data = data
         self.filename = filename
+        self.labels = labels
 
         self.ui.data_load_all.pressed.connect(self.populate_table)
         self.ui.raw_load_all.pressed.connect(self.populate_raw)
@@ -561,7 +595,7 @@ class ArrayPlotDialog(QDockWidget):
         self.current_line_number += 1
 
     def detail_dialog(self):
-        ViewArrayDialog(self.parent, self.data, self.windowTitle()).exec_()
+        ViewArrayDialog(self.parent, self.data, self.windowTitle(), self.labels).open()
 
     def show(self):
         super().show()
@@ -581,7 +615,7 @@ class FilePlotDialog(ArrayPlotDialog):
         self.filename = filename
 
     def detail_dialog(self):
-        ViewFileDialog(self.parent, self.data, self.filename).exec_()
+        ViewFileDialog(self.parent, self.data, self.filename, self.labels).open()
 
 
 class AddAxesDialog(QDialog):
@@ -673,6 +707,7 @@ class AxesOptions(QWidget):
     def __init__(self, axes, limit_dialog, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.axes = axes
+        self.axes._plopy_options = self
         self.ui = Ui_AxesOptions()
         self.ui.setupUi(self)
 
@@ -971,7 +1006,9 @@ class MainWindow(QMainWindow):
         #print(dir(nav))
 
         self.add_existing_lines()
+        qapp.processEvents()
         self.add_arrays(_data_to_load)
+        qapp.processEvents()
         self.add_data_files(_files_to_load, always_alert=True)
 
     def choose_data_files(self, date_format=None):
@@ -1064,8 +1101,20 @@ class MainWindow(QMainWindow):
 
 
 def export_axes(f, ax, name='ax'):
+    for attr in ('title', 'xlabel', 'ylabel', 'xlim', 'ylim', 'xscale', 'yscale', 'aspect'):
+        f.write(f'{name}.set_{attr}({getattr(ax, f"get_{attr}")()!r})\n')
+
     if not ax.get_frame_on():
         f.write(f"{name}.set_frame_on(False)\n")
+
+    try:
+        opt = ax._plopy_options
+    except AttributeError:
+        pass
+    else:
+        f.write(f"{name}.grid({opt.ui.grid.isChecked()})\n")
+
+    f.write("\n")
 
     for line in ax.lines:
         f.write(f"""{name}.plot(
@@ -1076,9 +1125,14 @@ def export_axes(f, ax, name='ax'):
 )
 """)
 
+    try:
+        f.write(f"{name}.legend({repr(ax.plopy_legend_loc) if ax.plopy_legend_loc else ''})\n")
+    except AttributeError:
+        f.write("ax.legend()\n")
+
 def export(filename, figure=fig):
     with open(filename, "w") as f:
-        f.write("""use_plopy = True
+        f.write(f"""use_plopy = True
 
 if use_plopy:
     try:
@@ -1088,6 +1142,8 @@ if use_plopy:
 if not use_plopy:
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots()
+
+fig.suptitle({fig._suptitle.get_text() if fig._suptitle else ''!r})
 
 """)
         if len(fig.axes) == 1:
@@ -1141,4 +1197,8 @@ show = start
 
 
 if __name__ == "__main__":
+    for filename in sys.argv:
+        if filename.endswith("__.py"):
+            continue
+        add_file(filename)
     exit(start())

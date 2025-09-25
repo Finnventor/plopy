@@ -199,6 +199,10 @@
    <property name="statusTip">
     <string>Save the current plot as a Python program for interactive viewing or editing</string>
    </property>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+E</string>
+   </property>
   </action>
  </widget>
  <resources/>
